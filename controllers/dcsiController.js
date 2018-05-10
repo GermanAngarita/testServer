@@ -1346,7 +1346,7 @@ function getFrftOffenders(req, res){
                     frftOffenders[n].name = "Taller Ocupado"
                     break;
                     case 3:
-                    frftOffenders[n].name = "No puedieron resolver la falla"
+                    frftOffenders[n].name = "No pudieron resolver la falla"
                     break;
                     case 4:
                     frftOffenders[n].name = "Nueva falla despues de la reparación"
