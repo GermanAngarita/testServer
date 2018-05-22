@@ -14,6 +14,7 @@ const ClinicController = require('../controllers/clinicController')
 const ClinicReqController = require('../controllers/clinicReqController')
 const DcsiController = require('../controllers/dcsiController')
 const DcsiSurveyController = require('../controllers/dcsiSurveyController')
+const DcsiALT = require('../controllers/dcsiControllerALT')
 const isAuth = require('../middlewares/auth')
 const api = express.Router()
 
@@ -102,6 +103,7 @@ api.post('/clinic/report/general/cot', ClinicReqController.reportCotizaciones)
 api.post('/clinic/report/general/byClinic', ClinicReqController.getReportByClinic)
 
 //DCSI
+api.post('/upload/dcsi', DcsiController.saveDsci)
 api.get('/report/getdcsi',isAuth, DcsiController.getDcsi)
 api.post('/report/kascGeneral',isAuth, DcsiController.getKascGeneral)
 api.post('/report/kasc',isAuth, DcsiController.getKasc)
@@ -120,6 +122,19 @@ api.post('/report/getFrftByDealer',isAuth, DcsiController.getFrftByDealer)
 api.post('/report/getfrftTopOffenders',isAuth, DcsiController.getfrftTopOffenders)
 api.post('/report/getFrftbyPer',isAuth, DcsiController.getFrftbyPer)
 api.post('/report/getFrftOffenders',isAuth, DcsiController.getFrftOffenders)
+
+//DCSI ALT
+api.post('/report/kacsGeneral_alt', DcsiALT.kacsGeneral)
+api.post('/report/satisfactionIndKacs', DcsiALT.satisfactionIndKacs)
+api.post('/report/satisfactionIndFRFT', DcsiALT.satisfactionIndFRFT)
+api.post('/report/satisfactionIndLoyalty', DcsiALT.satisfactionIndLoyalty)
+api.post('/report/getKacsResultALT', DcsiALT.getKacsResult)
+api.post('/report/getKacsResultTrimonthALT', DcsiALT.getKacsResultTrimonth)
+api.post('/report/loyaltyPerDealer', DcsiALT.loyaltyPerDealer)
+api.post('/report/getKascDetailsALT', DcsiALT.getKascDetails)
+api.post('/report/getRevisitDetailsALT', DcsiALT.getRevisitDetails)
+api.post('/report/getRecommendDetailsALT', DcsiALT.getRecommendDetails)
+api.post('/report/getFrftByDealerALT', DcsiALT.getFrftByDealer)
 
 //DCSI Survey
 api.get('/survey', DcsiSurveyController.getSurveys)
