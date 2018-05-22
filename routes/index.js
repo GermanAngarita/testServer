@@ -103,7 +103,7 @@ api.post('/clinic/report/general/cot', ClinicReqController.reportCotizaciones)
 api.post('/clinic/report/general/byClinic', ClinicReqController.getReportByClinic)
 
 //DCSI
-api.post('/upload/dcsi', DcsiController.saveDsci)
+//api.post('/upload/dcsi', DcsiController.saveDsci)
 api.get('/report/getdcsi',isAuth, DcsiController.getDcsi)
 api.post('/report/kascGeneral',isAuth, DcsiController.getKascGeneral)
 api.post('/report/kasc',isAuth, DcsiController.getKasc)
