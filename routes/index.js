@@ -12,9 +12,10 @@ const TicketController = require('../controllers/ticketController')
 const MailerController = require('../controllers/mailerController')
 const ClinicController = require('../controllers/clinicController')
 const ClinicReqController = require('../controllers/clinicReqController')
-const DcsiController = require('../controllers/dcsiController')
 const DcsiSurveyController = require('../controllers/dcsiSurveyController')
 const DcsiALT = require('../controllers/dcsiControllerALT')
+const KotController = require('../controllers/kotController')
+
 const isAuth = require('../middlewares/auth')
 const api = express.Router()
 
@@ -103,26 +104,6 @@ api.post('/clinic/report/general/cot', ClinicReqController.reportCotizaciones)
 api.post('/clinic/report/general/byClinic', ClinicReqController.getReportByClinic)
 
 //DCSI
-//api.post('/upload/dcsi', DcsiController.saveDsci)
-api.get('/report/getdcsi',isAuth, DcsiController.getDcsi)
-api.post('/report/kascGeneral',isAuth, DcsiController.getKascGeneral)
-api.post('/report/kasc',isAuth, DcsiController.getKasc)
-api.post('/report/filterDate',isAuth,DcsiController.getDateDcsi)
-api.post('/report/kascLast',isAuth, DcsiController.getKascLastMonth)
-api.post('/report/indicatorSat',isAuth, DcsiController.getLoyalty)
-api.post('/report/getDcsiByDate',isAuth, DcsiController.getDcsisByDate)
-api.post('/report/ticketByDate',isAuth, TicketController.countTicketsByDate)
-api.post('/report/getKacsResult',isAuth, DcsiController.getKacsResult)
-api.post('/report/getKacsTrimonth',isAuth, DcsiController.getKacsResultTrimonth)
-api.post('/report/getLoyaltyByDealer',isAuth, DcsiController.getLoyaltyByDealer)
-api.post('/report/getKascDetails',isAuth, DcsiController.getKascDetails)
-api.post('/report/getRevisitDetails',isAuth, DcsiController.getRevisitDetails)
-api.post('/report/getRecommendDetails',isAuth,DcsiController.getRecommendDetails)
-api.post('/report/getFrftByDealer',isAuth, DcsiController.getFrftByDealer)
-api.post('/report/getfrftTopOffenders',isAuth, DcsiController.getfrftTopOffenders)
-api.post('/report/getFrftbyPer',isAuth, DcsiController.getFrftbyPer)
-api.post('/report/getFrftOffenders',isAuth, DcsiController.getFrftOffenders)
-
 
 //DCSI ALT
 api.post('/report/kacsGeneral_alt', DcsiALT.kacsGeneral)
@@ -136,6 +117,16 @@ api.post('/report/getKascDetailsALT', DcsiALT.getKascDetails)
 api.post('/report/getRevisitDetailsALT', DcsiALT.getRevisitDetails)
 api.post('/report/getRecommendDetailsALT', DcsiALT.getRecommendDetails)
 api.post('/report/getFrftByDealerALT', DcsiALT.getFrftByDealer)
+api.post('/report/getFrftOffendersALT', DcsiALT.getFrftOffenders)
+api.post('/report/getfrftTopOffendersALT', DcsiALT.getfrftTopOffenders)
+api.post('/report/getkacsAverage', DcsiALT.getkacsAverage)
+api.post('/report/getLoyaltyAverage', DcsiALT.getLoyaltyAverage)
+api.post('/report/getFrftAverage', DcsiALT.getFrftAverage)
+
+api.post('/report/getKotPerDealer', KotController.getKotPerDealer)
+
+//KOT Kia On Time
+api.post('/uploads/newKot', KotController.addKot)
 
 //DCSI Survey
 api.get('/survey', DcsiSurveyController.getSurveys)
