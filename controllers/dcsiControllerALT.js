@@ -16,7 +16,7 @@ function kacsGeneral(req, res){
     Dcsi.aggregate([
         { $match: { date:{$lte:dateTo} }},
         { $match: { date:{$gte:dateFrom} }},
-        { $match: {cod_dealer:{$in: group} }},
+        { $match: { cod_dealer:{$in: group} }},
         { $match: { answer:{ $nin:[0]} }},
         { $match: { cod_dcsi:"BQ010" }},
         { $group:{
@@ -121,7 +121,7 @@ function satisfactionIndKacs(req, res){
     let periodo = parseInt(req.body.periodos)
     Dcsi.aggregate([
         { $match: { date:{$lte:dateTo} }},
-        { $match: {cod_dealer:{$in: group} }},
+        { $match: { cod_dealer:{$in: group} }},
         { $match: { answer:{ $nin:[0]} }},
         { $match: { cod_dcsi:"BQ010" }},
         { $group: {
@@ -158,7 +158,7 @@ function satisfactionIndKacs(req, res){
     })
 }
 function satisfactionIndFRFT(req, res){
-    let data = { labels:[], values:[] }
+    let data = { labels:[], values:[], color:[] }
     let dateFrom = parseInt(req.body.fromDate)
     let dateTo = parseInt(req.body.toDate) 
     let group = req.body.group
@@ -202,7 +202,21 @@ function satisfactionIndFRFT(req, res){
                             
                             Math.round((j.total / i.surveys * 100)*100)/100
                         )
+                        if((j.total / i.surveys)>0.95 || (j.total / i.surveys)==0.95){
+                            data.color.push(
+                                'rgba(119,241,134)'
+                            )
+                        } else if( (j.total / i.surveys)<0.95 && (j.total / i.surveys)>0.90 ){
+                            data.color.push(
+                                'rgba(249,234,43)'
+                            )
+                        } else {
+                            data.color.push(
+                                'rgba(250,152,173)'
+                            )
+                        }
                     }
+                    
                 }
 
             }
@@ -1171,10 +1185,624 @@ function getFrftByDealer(req, res){
                     }
                     return -1;
                 })
-                let newData = {labels:[], values:[], color:[]}
+                let newData = {labels:[], values:[], color:[], cl:[]}
                 for(let i of data){
                     newData.labels.push(
                         i.name
+                    )
+                    newData.cl.push(
+                        i.cl
+                    )
+                    newData.values.push(
+                        Math.round(i.value*100)/100
+                    )
+                    if(i.value > 95 || i.value==95){
+                        newData.color.push(
+                            'rgba(119, 241, 134)'
+                        )
+                    } else if(i.value<95 && (i.value>90 || i.value==90)){
+                        newData.color.push(
+                            'rgba(249, 234, 43)'
+                        )
+                    } else {
+                        newData.color.push(
+                            'rgba(250, 152, 173)'
+                        )
+                    }
+                }
+                res.status(200).send(newData)
+            })
+        }
+    })
+}
+function getFrftOffenders(req, res){
+    let data = { labels:[], values:[] }
+    let total = 0;
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: {cod_dealer:{$in: group} }},
+        { $match:{ cod_dcsi:"BQ030" }},
+        { $match:{ answer: {$nin:[0]} }},
+        { $group:{
+            _id:{ answer:"$answer"},
+            total:{$sum:1}
+        }},
+        { $project:{
+            _id:0,
+            answer:"$_id.answer",
+            total:"$total"
+        }},
+        { $sort:{answer:1}}
+    ],(err, frftOffenders)=>{
+        if(err) return res.status(500).send({message:`Error al obtener TopOffenders:${err}`})
+        if(frftOffenders.length>0){
+            
+            for(let i=0; i<frftOffenders.length;i++){
+                // 1. Primero Obtener el total de respuestas
+                total += frftOffenders[i].total
+            }
+            for(let n=0;n<frftOffenders.length; n++){
+                switch(frftOffenders[n].answer){
+                    case 1:
+                    frftOffenders[n].name = "Repuestos no disponibles"
+                    break;
+                    case 2:
+                    frftOffenders[n].name = "Taller Ocupado"
+                    break;
+                    case 3:
+                    frftOffenders[n].name = "No puedieron resolver la falla"
+                    break;
+                    case 4:
+                    frftOffenders[n].name = "Nueva falla despues de la reparación"
+                    break;
+                    case 5:
+                    frftOffenders[n].name = "Repararon lo que no era"
+                    break;
+                    case 6:
+                    frftOffenders[n].name = "Taller no detecto la falla"
+                    break;
+                    case 7:
+                    frftOffenders[n].name = "Otros"
+                    break;
+                }
+                frftOffenders[n].value = frftOffenders[n].total / total *100
+            }
+
+            for(let i of frftOffenders){
+                data.labels.push(
+                    i.name
+                )
+                data.values.push(
+                    Math.round(i.value*100)/100
+                )
+            }
+        }
+        
+        res.status(200).send(data)
+    })
+}
+function getfrftTopOffenders(req,res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    
+
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: {cod_dealer:{$in: group} }},
+        { $match:{ cod_dcsi:"BQ030" }},
+        { $match:{ answer: {$nin:[0]} }},
+        { $group:{
+            _id:{ answer:"$answer", dealer:"$cod_dealer" },
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:"$_id.answer",
+            total:{ $sum:"$total" },
+            details:{
+                $push:{
+                    dealer:"$_id.dealer",
+                    name:'',
+                    total:{ $sum: "$total"}
+                }
+            }
+        }},
+        { $project:{
+            _id:0,
+            answer:"$_id",
+            series:"$details"
+        }},
+        { $sort: { answer: 1}}
+    ], (err, topOffenders)=>{
+        if(err) return res.status(500).send({message:`Error al obtener topOffenders FRFT ${err}`})
+        if(topOffenders.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ],(err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al obtener los dealers ${err}`})
+                for(let i=0; i<topOffenders.length;i++){
+                    let total_answer = 0
+                    //Espacio para detallar las preguntas
+                    switch(topOffenders[i].answer){
+                        case 1:
+                        topOffenders[i].name = "Repuestos no disponibles"
+                        break;
+                        case 2:
+                        topOffenders[i].name = "Taller Ocupado"
+                        break;
+                        case 3:
+                        topOffenders[i].name = "No pudieron resolver la falla"
+                        break;
+                        case 4:
+                        topOffenders[i].name = "Nueva falla despues de la reparación"
+                        break;
+                        case 5:
+                        topOffenders[i].name = "Repararon lo que no era"
+                        break;
+                        case 6:
+                        topOffenders[i].name = "Taller no detecto la falla"
+                        break;
+                        case 7:
+                        topOffenders[i].name = "Otros"
+                        break;
+                    }
+                    for(let j=0;j<topOffenders[i].series.length;j++){
+                        for(let k=0; k<dealer.length;k++){
+                            if(topOffenders[i].series[j].dealer == dealer[k].cl){
+                                topOffenders[i].series[j].name = dealer[k].av
+                            }
+                        }
+                        total_answer += topOffenders[i].series[j].total
+                    }
+                    topOffenders[i].total = total_answer
+                    for(let m=0; m<topOffenders[i].series.length;m++){
+                        topOffenders[i].series[m].value = topOffenders[i].series[m].total / topOffenders[i].total * 100
+                    }
+                }
+                let newData = { data:[], group:group }
+                for(let i=0;i< topOffenders.length; i++){
+                    newData.data.push({
+                        label:topOffenders[i].name,
+                        values:[]
+                    })
+                    for(let k=0;k<group.length; k++){
+                        newData.data[i].values.push(0)
+                        for(let j=0; j<topOffenders[i].series.length; j++){
+                            if(group[k] == topOffenders[i].series[j].dealer){
+                                newData.data[i].values[k] = Math.round(topOffenders[i].series[j].value*100)/100
+                                // newData.data[i].labels.push(
+                                //     topOffenders[i].series[j].name
+                                // )
+                            }
+                        }
+                    }
+                }
+                
+                res.status(200).send(newData)
+            })
+        }
+        
+    })
+}
+function getkacsAverage(req, res){
+    let info = {
+        promedio:'',
+        up:'',
+        bot:'',
+        min:{dealer:'', value:''},
+        max:{dealer:'', value:''},
+        dealers:'',
+        avgCountry:[]
+    }
+    let data = {
+        labels:[],
+        values:[],
+        color:[],
+    }
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { answer:{ $nin:[0]} }},
+        { $match: { cod_dcsi:"BQ010" }},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", answer:"$answer" },
+            total: { $sum:1},
+            
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            surveys:{ $sum: "$total"},
+            answers:{
+                $push:{
+                    answer:"$_id.answer",
+                    total:"$total",
+                    point: { $multiply:[ "$total", "$_id.answer" ]}
+                }
+            }
+        }},
+        { $project:{
+            _id:0,
+            dealer:"$_id",
+            surveys:"$surveys",
+            maxPoint:{ $multiply:[ "$surveys", 5 ]},
+            answers:"$answers"
+        }}
+    ],(err, kacs)=>{
+        if(err) return res.status(500).send({message:`Error al consultar los kacs ${err}`})
+        if(kacs.length>0){
+            //Llamada a los dealers
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ],(err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al traer los dealers ${err}`})
+                for(let j of dealer){
+                    for(let i=0; i<kacs.length; i++){
+                    
+                        if(kacs[i].dealer == j.cl){
+                            kacs[i].dealer = j.av
+                        }
+                    }
+                }
+                kacs.sort((a,b)=>{
+                    if(a.dealer > b.dealer){
+                        return 1
+                    }
+                    if(a.dealer > b.dealer){
+                        return -1
+                    }
+                    return -1;
+                })
+                for(let i of kacs){
+                    let pointTotal = 0
+                    let kacs = 0
+                    for(let k of i.answers){
+                        pointTotal += k.point
+                    }
+                    kacs = Math.round((pointTotal / i.maxPoint * 100)*100)/100
+                    data.labels.push(
+                        i.dealer
+                    )
+                    data.values.push(
+                        kacs
+                    )
+                    if((kacs >85) || (kacs == 85)){
+                        // Verde
+                        data.color.push(
+                            'rgba(119, 241, 134)'
+                        )
+                    } else if((kacs > 84 || kacs == 84 ) && (kacs < 85)){
+                        //Amarillo
+                        data.color.push(
+                            'rgba(249, 234, 43)'
+                        )
+                    } else if(kacs<84){
+                        //Rojo
+                        data.color.push(
+                            'rgba(250, 152, 173)'
+                        )
+                    }
+                }
+                //Calculo del promedio
+                let sum = 0
+                for(let i of data.values){
+                    sum += i
+                }
+                info.promedio = Math.round( (sum / parseInt(data.values.length))*100 )/100
+                //Total Dealers
+                info.dealers = parseInt(data.values.length)
+                //Min y Max
+                let dealersSorts = []
+                for(let i=0; i<data.labels.length; i++){
+                    dealersSorts.push({
+                        name:data.labels[i],
+                        values:data.values[i]
+                    })
+                }
+                dealersSorts.sort((a,b)=>{
+                    if(a.values > b.values){
+                        return 1
+                    }
+                    if(a.values > b.values){
+                        return -1
+                    }
+                    return -1;
+                })
+                info.max.dealer = dealersSorts[dealersSorts.length-1].name
+                info.max.value = dealersSorts[dealersSorts.length-1].values
+                info.min.dealer = dealersSorts[0].name
+                info.min.value = dealersSorts[0].values
+                info.up = (info.promedio + info.max.value)/2
+                info.bot = (info.promedio + info.min.value)/2
+                for(let i=0; i<info.dealers; i++){
+                    info.avgCountry.push(
+                        info.promedio
+                    )
+                }
+                res.status(200).send(info)
+                
+            })
+            
+        } else {
+            res.status(200).send(data)
+        }
+    })
+}
+function getLoyaltyAverage(req, res){
+    let info = {
+        promedio:'',
+        up:'',
+        bot:'',
+        min:{dealer:'', value:''},
+        max:{dealer:'', value:''},
+        dealers:'',
+        avgCountry:[]
+    }
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate)
+    let group = req.body.group
+    let data = {labels:[], values:[], color:[]}
+    let dcsi = ["BQ010", "CQ010", "CQ020"]
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dcsi:{ $in:dcsi} }},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", lead:"$lead_id", dcsi:"$cod_dcsi", answer:"$answer" }
+        }},
+        { $group:{
+            _id:{ dealer:"$_id.dealer", lead:"$_id.lead" },
+            dcsis:{
+                $push:{
+                    dcsi:"$_id.dcsi",
+                    answer:"$_id.answer"
+                }
+            }
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            surveys:{ 
+                $push:{
+                    lead:"$_id.lead",
+                    dcsis:"$dcsis"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dealer:"$_id",
+            surveys:"$surveys"
+        }},
+        { $limit: 100}
+    ], (err, loyalty)=>{
+        if(err) return res.status(500).send({message:`Error al obtener la lealtad por dealer ${err}`})
+        if(loyalty.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ],(err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al obtener los dealers ${err}`})
+                if(dealer.length>0){
+                    for(let i=0; i<loyalty.length;i++){
+                        for(let j=0; j<dealer.length; j++){
+                            if(loyalty[i].dealer == dealer[j].cl){
+                                loyalty[i].dealer = dealer[j].av
+                            }
+                        }
+                    }
+                }
+                loyalty.sort((a,b)=>{
+                    if(a.dealer > b.dealer){
+                        return 1
+                    }
+                    if(a.dealer > b.dealer){
+                        return -1
+                    }
+                    return -1;
+                })
+                for(let i of loyalty){
+                    let total = 0
+                    data.labels.push(
+                        i.dealer
+                    )
+                    for(let j of i.surveys){
+                        let acc = 0
+                        for(let k of j.dcsis){
+                            switch(k.dcsi){
+                                case "BQ010":
+                                if(k.answer == 5){
+                                    acc += 1
+                                }
+                                break;
+                                case "CQ010":
+                                if(k.answer > 8){
+                                    acc += 1
+                                }
+                                break;
+                                case "CQ020":
+                                if(k.answer == 5){
+                                    acc += 1
+                                }
+                                break;
+                            }
+                            if(acc == 3){
+                                total += 1
+                            }
+                        }
+                    }
+                    data.values.push(
+                        Math.round((total / i.surveys.length * 100)*100)/100
+                    )
+                    if((total / i.surveys.length)>0.44 || (total / i.surveys.length)== 0.44){
+                        data.color.push(
+                            'rgba(119,241,134)'
+                        )
+                    } else if((total / i.surveys.length)< 0.44 && (total / i.surveys.length)>0.399){
+                        data.color.push(
+                            'rgba(249,234,43)'
+                        )
+                    } else {
+                        data.color.push(
+                            'rgba(250,152,173)'
+                        )
+                    }
+                }
+                //Calculo del promedio
+                let sum = 0
+                for(let i of data.values){
+                    sum += i
+                }
+                info.promedio = Math.round( (sum / parseInt(data.values.length))*100 )/100
+                //Total Dealers
+                info.dealers = parseInt(data.values.length)
+                //Min y Max
+                let dealersSorts = []
+                for(let i=0; i<data.labels.length; i++){
+                    dealersSorts.push({
+                        name:data.labels[i],
+                        values:data.values[i]
+                    })
+                }
+                dealersSorts.sort((a,b)=>{
+                    if(a.values > b.values){
+                        return 1
+                    }
+                    if(a.values > b.values){
+                        return -1
+                    }
+                    return -1;
+                })
+                info.max.dealer = dealersSorts[dealersSorts.length-1].name
+                info.max.value = dealersSorts[dealersSorts.length-1].values
+                info.min.dealer = dealersSorts[0].name
+                info.min.value = dealersSorts[0].values
+                info.up = (info.promedio + info.max.value)/2
+                info.bot = (info.promedio + info.min.value)/2
+                for(let i=0; i<info.dealers; i++){
+                    info.avgCountry.push(
+                        info.promedio
+                    )
+                }
+                res.status(200).send(info)
+
+            })
+        } else {
+            res.status(200).send({message:`Objeto sin datos`})
+        }
+        
+    })
+}
+function getFrftAverage(req, res){
+    let info = {
+        promedio:'',
+        up:'',
+        bot:'',
+        min:{dealer:'', value:''},
+        max:{dealer:'', value:''},
+        dealers:'',
+        avgCountry:[]
+    }
+    let data = []
+    let colorData = []
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match:{ cod_dcsi:"BQ020"}},
+        { $match: { answer:{ $nin:[0]} }},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", answer:"$answer" },
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            total:{ $sum:"$total"},
+            answer:{
+                $push:{
+                    answer:"$_id.answer",
+                    total:"$total"
+                }
+            }
+        }},
+        { $project:{
+            _id:0,
+            cl:"$_id",
+            total:"$total",
+            answer:"$answer"
+        }}
+    ], (err, frft)=>{
+        if(err) return res.status(500).send({message:`Error al Obtener el FRFT ${err}`})
+        if(frft.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ], (err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al obtener delaers ${err}`})
+                for(let i=0;i<frft.length;i++){
+                    for(let j=0;j<dealer.length;j++){
+                        if(frft[i].cl == dealer[j].cl){
+                            for(let k=0; k<frft[i].answer.length;k++){
+                                if(frft[i].answer[k].answer == 1){
+                                    data.push({
+                                        name:dealer[j].av,
+                                        value:frft[i].answer[k].total / frft[i].total *100,
+                                        cl:dealer[j].cl
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+                data.sort((a,b)=>{
+                    if(a.name > b.name){
+                        return 1
+                    }
+                    if(a.name > b.name){
+                        return -1
+                    }
+                    return -1;
+                })
+                let newData = {labels:[], values:[], color:[], cl:[]}
+                for(let i of data){
+                    newData.labels.push(
+                        i.name
+                    )
+                    newData.cl.push(
+                        i.cl
                     )
                     newData.values.push(
                         Math.round(i.value*100)/100
@@ -1193,7 +1821,45 @@ function getFrftByDealer(req, res){
                         )
                     }
                 }
-                res.status(200).send(newData)
+                
+
+                //Calculo del promedio
+                let sum = 0
+                for(let i of newData.values){
+                    sum += i
+                }
+                info.promedio = Math.round( (sum / parseInt(newData.values.length))*100 )/100
+                //Total Dealers
+                info.dealers = parseInt(newData.values.length)
+                //Min y Max
+                let dealersSorts = []
+                for(let i=0; i<newData.labels.length; i++){
+                    dealersSorts.push({
+                        name:newData.labels[i],
+                        values:newData.values[i]
+                    })
+                }
+                dealersSorts.sort((a,b)=>{
+                    if(a.values > b.values){
+                        return 1
+                    }
+                    if(a.values > b.values){
+                        return -1
+                    }
+                    return -1;
+                })
+                info.max.dealer = dealersSorts[dealersSorts.length-1].name
+                info.max.value = dealersSorts[dealersSorts.length-1].values
+                info.min.dealer = dealersSorts[0].name
+                info.min.value = dealersSorts[0].values
+                info.up = (info.promedio + info.max.value)/2
+                info.bot = (info.promedio + info.min.value)/2
+                for(let i=0; i<info.dealers; i++){
+                    info.avgCountry.push(
+                        info.promedio
+                    )
+                }
+                res.status(200).send(info)
             })
         }
     })
@@ -1210,5 +1876,10 @@ module.exports = {
     getKascDetails,
     getRevisitDetails,
     getRecommendDetails,
-    getFrftByDealer
+    getFrftByDealer,
+    getFrftOffenders,
+    getfrftTopOffenders,
+    getkacsAverage,
+    getLoyaltyAverage,
+    getFrftAverage
 }
