@@ -53,7 +53,7 @@ function signIn( req, res ){
                 userEmail: userEmail,
                 token: service.createToken(user)
             })
-            res.status(500).send({message:`La contraseña no es válida`})
+            res.status(200).send({message:`La contraseña no es válida`})
         })
     })
 }
@@ -79,8 +79,8 @@ function upDateUser (req, res){
             if(err) return res.status(500).send({msg:`Ocurrio un error al hashear el password ${err}`})
             upDate.password = hash
             User.findByIdAndUpdate(userId, upDate, (err, userUp) =>{
-                if(err) res.status(500).send({message:`Error al Actualizar el Cliente: ${err}`})
-                res.status(200).send({user: userUp})
+                if(err) res.status(500).send({msg:`Error al Actualizar el Cliente: ${err}`})
+                res.status(200).send({user: userUp, msg:`Actualizado Correctamente!`})
             })
         })
     })
