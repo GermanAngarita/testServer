@@ -1864,6 +1864,23 @@ function getFrftAverage(req, res){
         }
     })
 }
+function getPer(req, res){
+    Dcsi.aggregate([
+        { $group: {
+            _id: { $substr:[ "$date", 0, 6 ]}
+        }},
+        { $project:{
+            _id:0,
+            per:"$_id",
+            from:{ $concat:[ "$_id", "01" ]},
+            to:{ $concat:[ "$_id", "31" ]}
+        }},
+        { $sort:{ per:-1 }}
+    ], (err, per)=>{
+        if(err) return res.status(500).send(200)
+        res.status(200).send(per)
+    })
+}
 
 module.exports = {
     kacsGeneral,
@@ -1881,5 +1898,6 @@ module.exports = {
     getfrftTopOffenders,
     getkacsAverage,
     getLoyaltyAverage,
-    getFrftAverage
+    getFrftAverage,
+    getPer
 }
