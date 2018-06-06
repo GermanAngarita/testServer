@@ -106,6 +106,7 @@ api.post('/clinic/report/general/byClinic', ClinicReqController.getReportByClini
 //DCSI
 
 //DCSI ALT
+api.post('/report/getPer', DcsiALT.getPer)
 api.post('/report/kacsGeneral_alt', DcsiALT.kacsGeneral)
 api.post('/report/satisfactionIndKacs', DcsiALT.satisfactionIndKacs)
 api.post('/report/satisfactionIndFRFT', DcsiALT.satisfactionIndFRFT)
@@ -127,6 +128,13 @@ api.post('/report/getKotPerDealer', KotController.getKotPerDealer)
 
 //KOT Kia On Time
 api.post('/uploads/newKot', KotController.addKot)
+api.post('/report/getSendPerDealer', KotController.getSendPerDealer)
+api.post('/report/getPointsperDealer', KotController.getPointsPerDealer)
+api.post('/report/getPhotoPerDealer', KotController.getPhotoPerDealer)
+api.post('/report/getVideoPerDealer', KotController.getVideoPerDealer)
+api.post('/report/getTimePerDealer', KotController.getTimePerDealer)
+
+api.post('/report/getAvg', KotController.getAvg)
 
 //DCSI Survey
 api.get('/survey', DcsiSurveyController.getSurveys)
