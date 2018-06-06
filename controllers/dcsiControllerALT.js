@@ -654,6 +654,7 @@ function loyaltyPerDealer(req, res){
     Dcsi.aggregate([
         { $match: { date:{$lte:dateTo} }},
         { $match: { date:{$gte:dateFrom} }},
+        { $match: { answer:{ $nin:[0]} }},
         { $match: { cod_dealer:{$in: group} }},
         { $match: { cod_dcsi:{ $in:dcsi} }},
         { $group:{
@@ -680,8 +681,7 @@ function loyaltyPerDealer(req, res){
             _id:0,
             dealer:"$_id",
             surveys:"$surveys"
-        }},
-        { $limit: 100}
+        }}
     ], (err, loyalty)=>{
         if(err) return res.status(500).send({message:`Error al obtener la lealtad por dealer ${err}`})
         if(loyalty.length>0){
@@ -1474,11 +1474,17 @@ function getkacsAverage(req, res){
                     }
                     return -1;
                 })
+                let avgMaxPointTotal = 0
+                let avgTotalPoint = 0
                 for(let i of kacs){
                     let pointTotal = 0
                     let kacs = 0
+
+                    avgMaxPointTotal += i.maxPoint
+
                     for(let k of i.answers){
                         pointTotal += k.point
+                        avgTotalPoint +=k.point
                     }
                     kacs = Math.round((pointTotal / i.maxPoint * 100)*100)/100
                     data.labels.push(
@@ -1509,7 +1515,8 @@ function getkacsAverage(req, res){
                 for(let i of data.values){
                     sum += i
                 }
-                info.promedio = Math.round( (sum / parseInt(data.values.length))*100 )/100
+                // info.promedio = Math.round( (sum / parseInt(data.values.length))*100 )/100
+                info.promedio = Math.round( avgTotalPoint/(avgMaxPointTotal)*10000 )/100
                 //Total Dealers
                 info.dealers = parseInt(data.values.length)
                 //Min y Max
@@ -1592,8 +1599,7 @@ function getLoyaltyAverage(req, res){
             _id:0,
             dealer:"$_id",
             surveys:"$surveys"
-        }},
-        { $limit: 100}
+        }}
     ], (err, loyalty)=>{
         if(err) return res.status(500).send({message:`Error al obtener la lealtad por dealer ${err}`})
         if(loyalty.length>0){
@@ -1626,27 +1632,31 @@ function getLoyaltyAverage(req, res){
                     }
                     return -1;
                 })
+                let countTotal = 0
+                let sumTotal = 0
                 for(let i of loyalty){
                     let total = 0
                     data.labels.push(
                         i.dealer
                     )
+                    let count = 0
                     for(let j of i.surveys){
+                        count +=1 
                         let acc = 0
                         for(let k of j.dcsis){
                             switch(k.dcsi){
                                 case "BQ010":
-                                if(k.answer == 5){
+                                if(parseInt(k.answer) === 5){
                                     acc += 1
                                 }
                                 break;
                                 case "CQ010":
-                                if(k.answer > 8){
+                                if(parseInt(k.answer) > 8){
                                     acc += 1
                                 }
                                 break;
                                 case "CQ020":
-                                if(k.answer == 5){
+                                if(parseInt(k.answer) == 5){
                                     acc += 1
                                 }
                                 break;
@@ -1656,8 +1666,10 @@ function getLoyaltyAverage(req, res){
                             }
                         }
                     }
+                    countTotal += count 
+                    sumTotal += total
                     data.values.push(
-                        Math.round((total / i.surveys.length * 100)*100)/100
+                        total / i.surveys.length
                     )
                     if((total / i.surveys.length)>0.44 || (total / i.surveys.length)== 0.44){
                         data.color.push(
@@ -1672,13 +1684,14 @@ function getLoyaltyAverage(req, res){
                             'rgba(250,152,173)'
                         )
                     }
+                    
                 }
                 //Calculo del promedio
                 let sum = 0
                 for(let i of data.values){
                     sum += i
                 }
-                info.promedio = Math.round( (sum / parseInt(data.values.length))*100 )/100
+                info.promedio = Math.round( sumTotal/countTotal *10000 )/100
                 //Total Dealers
                 info.dealers = parseInt(data.values.length)
                 //Min y Max
@@ -1699,11 +1712,11 @@ function getLoyaltyAverage(req, res){
                     return -1;
                 })
                 info.max.dealer = dealersSorts[dealersSorts.length-1].name
-                info.max.value = dealersSorts[dealersSorts.length-1].values
-                info.min.dealer = dealersSorts[0].name
-                info.min.value = dealersSorts[0].values
-                info.up = (info.promedio + info.max.value)/2
-                info.bot = (info.promedio + info.min.value)/2
+                info.max.value = Math.round( dealersSorts[dealersSorts.length-1].values * 100)/100
+                info.min.dealer = dealersSorts[0].name 
+                info.min.value = Math.round( dealersSorts[0].values * 100 )/100
+                info.up = Math.round( (info.promedio + info.max.value)/2 *100)/100
+                info.bot = Math.round( (info.promedio + info.min.value)/2 *100)/100
                 for(let i=0; i<info.dealers; i++){
                     info.avgCountry.push(
                         info.promedio
@@ -1760,6 +1773,7 @@ function getFrftAverage(req, res){
         }}
     ], (err, frft)=>{
         if(err) return res.status(500).send({message:`Error al Obtener el FRFT ${err}`})
+        
         if(frft.length>0){
             Dealer.aggregate([
                 { $project:{
@@ -1772,11 +1786,19 @@ function getFrftAverage(req, res){
                 { $sort:{av:1}}
             ], (err, dealer)=>{
                 if(err) return res.status(500).send({message:`Error al obtener delaers ${err}`})
+                let avgTotalSurveys = 0
+                let avgFrftTotal = 0
                 for(let i=0;i<frft.length;i++){
+                    avgTotalSurveys += frft[i].total 
                     for(let j=0;j<dealer.length;j++){
                         if(frft[i].cl == dealer[j].cl){
                             for(let k=0; k<frft[i].answer.length;k++){
+
+                                
+                                
                                 if(frft[i].answer[k].answer == 1){
+
+                                    avgFrftTotal += frft[i].answer[k].total
                                     data.push({
                                         name:dealer[j].av,
                                         value:frft[i].answer[k].total / frft[i].total *100,
@@ -1828,7 +1850,8 @@ function getFrftAverage(req, res){
                 for(let i of newData.values){
                     sum += i
                 }
-                info.promedio = Math.round( (sum / parseInt(newData.values.length))*100 )/100
+                
+                info.promedio = Math.round( avgFrftTotal / avgTotalSurveys * 10000 )/100
                 //Total Dealers
                 info.dealers = parseInt(newData.values.length)
                 //Min y Max
