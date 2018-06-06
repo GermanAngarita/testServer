@@ -53,7 +53,7 @@ function signIn( req, res ){
                 userEmail: userEmail,
                 token: service.createToken(user)
             })
-            res.status(200).send({message:`La contraseña no es válida`})
+            res.status(500).send({message:`La contraseña no es válida`})
         })
     })
 }
