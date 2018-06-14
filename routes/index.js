@@ -69,6 +69,9 @@ api.post('/vio/totalByFrom', isAuth, VinController.totalByFrom)
 
 //Models
 api.get('/models', isAuth, ModelController.getModels)
+api.post('/newModels', isAuth, ModelController.newModel)
+api.post('/deletModel/:_id', isAuth, ModelController.deletModel)
+api.post('/models/uploadImg', ModelController.uploadImg)
 
 //DownLoads
 api.get('/downloadExcel', DownLoadController.exportExcel)
@@ -125,6 +128,9 @@ api.post('/report/getLoyaltyAverage', DcsiALT.getLoyaltyAverage)
 api.post('/report/getFrftAverage', DcsiALT.getFrftAverage)
 
 api.post('/report/getKotPerDealer', KotController.getKotPerDealer)
+api.post('/report/kacsGroup', DcsiALT.kacsGroup)
+api.post('/report/loyaltyGroup', DcsiALT.loyaltyGroup)
+api.post('/report/frftGroup', DcsiALT.frftGroup)
 
 //KOT Kia On Time
 api.post('/uploads/newKot', KotController.addKot)
@@ -135,6 +141,9 @@ api.post('/report/getVideoPerDealer', KotController.getVideoPerDealer)
 api.post('/report/getTimePerDealer', KotController.getTimePerDealer)
 
 api.post('/report/getAvg', KotController.getAvg)
+api.post('/report/getAvgUso', KotController.getAvgUso)
+api.post('/report/getAvgCountry', KotController.getAvgCountry)
+api.post('/report/getKotGroup', KotController.getKotGroup)
 
 //DCSI Survey
 api.get('/survey', DcsiSurveyController.getSurveys)
