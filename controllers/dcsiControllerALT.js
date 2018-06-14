@@ -87,12 +87,12 @@ function kacsGeneral(req, res){
                     data.values.push(
                         kacs
                     )
-                    if((kacs >85) || (kacs == 85)){
+                    if((kacs >86) || (kacs == 86)){
                         // Verde
                         data.color.push(
                             'rgba(119, 241, 134)'
                         )
-                    } else if((kacs > 84 || kacs == 84 ) && (kacs < 85)){
+                    } else if((kacs > 84 || kacs == 84 ) && (kacs < 86)){
                         //Amarillo
                         data.color.push(
                             'rgba(249, 234, 43)'
@@ -153,6 +153,10 @@ function satisfactionIndKacs(req, res){
                     Math.round((i.indicator * 100)*100)/100
                 )
             }
+        } else {
+            data.values.push(
+                "No se encontraron datos"
+            )
         }
         res.status(200).send(data)
     })
@@ -221,9 +225,9 @@ function satisfactionIndFRFT(req, res){
 
             }
         } else {
-            data = {
-                message:"No hay registros disponibles"
-            }
+            data.values.push(
+                "No se encontraron datos"
+            )
         }
         res.status(200).send(data)
     })
@@ -310,9 +314,9 @@ function satisfactionIndLoyalty(req, res){
                 )
             }
         }else {
-            data = {
-                message:"No hay registros disponibles"
-            }
+            data.values.push(
+                "No se encontraron datos"
+            )
         }
         res.status(200).send(data)
     })
@@ -1904,6 +1908,528 @@ function getPer(req, res){
         res.status(200).send(per)
     })
 }
+//Funciones get Per Group
+function kacsGroup(req, res){
+    let data = {
+        labels:[],
+        values:[],
+        // color:[],
+    }
+    let newData = {labels:[], values:[], color:[]}
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match: { answer:{ $nin:[0]} }},
+        { $match: { cod_dcsi:"BQ010" }},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", answer:"$answer" },
+            total: { $sum:1},
+            
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            surveys:{ $sum: "$total"},
+            answers:{
+                $push:{
+                    answer:"$_id.answer",
+                    total:"$total",
+                    point: { $multiply:[ "$total", "$_id.answer" ]}
+                }
+            }
+        }},
+        { $project:{
+            _id:0,
+            dealer:"$_id",
+            surveys:"$surveys",
+            maxPoint:{ $multiply:[ "$surveys", 5 ]},
+            answers:"$answers"
+        }}
+    ],(err, kacs)=>{
+        if(err) return res.status(500).send({message:`Error al consultar los kacs ${err}`})
+        if(kacs){
+            for(let i of kacs){
+                    let pointTotal = 0
+                    let kacs = 0
+                    for(let k of i.answers){
+                        pointTotal += k.point
+                    }
+                    kacs = Math.round((pointTotal / i.maxPoint * 100)*100)/100
+                    data.labels.push(
+                        i.dealer
+                    )
+                    data.values.push(
+                        kacs
+                    )
+                }
+            Dealer.aggregate([
+                // { $match: {cod_dealer:{$in: group} }},
+                { $match: {group_dealer:{ $nin:['PDI', 'NO GROUP']}} },
+                { $group: { _id:{ group:"$group_dealer", cl:"$dealer_cod"},  count:{ $sum: 1} } },
+                { $sort: { _id:-1 }},
+                { $group: {
+                    _id:"$_id.group",
+                    cl_group:{ $push:{ cl:"$_id.cl", value:"" }}
+                } },
+                { $project: {
+                    _id:0,
+                    group:"$_id",
+                    value:"",
+                    cl:"$cl_group"
+                }},
+                { $sort:{group:1}}
+            ], (err, dealerByGroup)=>{
+                if(err) return res.status(500).send({message:`Error: ${err}`})
+                if(dealerByGroup){
+                    for(let i=0; i<dealerByGroup.length; i++){
+                        for(let j=0; j<dealerByGroup[i].cl.length; j++){
+                            for(let k=0; k<data.labels.length; k++){
+                                if(dealerByGroup[i].cl[j].cl == data.labels[k]){
+                                    dealerByGroup[i].cl[j].value = data.values[k]
+                                }
+                            }
+                        }
+                    }
+
+                    for(let i of dealerByGroup){
+                        newData.labels.push(
+                            i.group
+                        )
+                        let sum = 0
+                        let totalItems = 0
+                        for(let j of i.cl){
+                            
+                            if(j.value){
+                                sum += j.value
+                                totalItems += 1
+                            }
+                        }
+                        newData.values.push(
+                            Math.round( (sum / totalItems) * 100 )/ 100
+                        )
+                    }
+                    for(let i of newData.values){
+                        if(i){
+                            if((i >86) || (i == 86)){
+                                // Verde
+                                newData.color.push(
+                                    'rgba(119, 241, 134)'
+                                )
+                            } else if((i > 84 || i == 84 ) && (i < 86)){
+                                //Amarillo
+                                newData.color.push(
+                                    'rgba(249, 234, 43)'
+                                )
+                            } else if(i<84){
+                                //Rojo
+                                newData.color.push(
+                                    'rgba(250, 152, 173)'
+                                )
+                            }
+                        } else {
+                            newData.color.push(
+                                'rgba(255, 255, 255)'
+                            )
+                        }
+                    }
+                    res.status(200).send(newData)
+                } else {
+                    res.status(200).send(newData)
+                }
+                
+            })
+        } else {
+            res.status(200).send(newData)
+        }
+    })
+}
+function loyaltyGroup(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate)
+    let group = req.body.group
+    let data = {labels:[],cl:[], values:[], color:[]}
+    let newData = {labels:[], values:[], color:[]}
+    let dcsi = ["BQ010", "CQ010", "CQ020"]
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { answer:{ $nin:[0]} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match: { cod_dcsi:{ $in:dcsi} }},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", lead:"$lead_id", dcsi:"$cod_dcsi", answer:"$answer" }
+        }},
+        { $group:{
+            _id:{ dealer:"$_id.dealer", lead:"$_id.lead" },
+            dcsis:{
+                $push:{
+                    dcsi:"$_id.dcsi",
+                    answer:"$_id.answer"
+                }
+            }
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            surveys:{ 
+                $push:{
+                    lead:"$_id.lead",
+                    dcsis:"$dcsis"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dealer:"$_id",
+            cl:"$_id",
+            surveys:"$surveys"
+        }}
+    ], (err, loyalty)=>{
+        if(err) return res.status(500).send({message:`Error al obtener la lealtad por dealer ${err}`})
+        if(loyalty.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ],(err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al obtener los dealers ${err}`})
+                if(dealer.length>0){
+                    for(let i=0; i<loyalty.length;i++){
+                        for(let j=0; j<dealer.length; j++){
+                            if(loyalty[i].dealer == dealer[j].cl){
+                                loyalty[i].dealer = dealer[j].av
+                            }
+                        }
+                    }
+                }
+                loyalty.sort((a,b)=>{
+                    if(a.dealer > b.dealer){
+                        return 1
+                    }
+                    if(a.dealer > b.dealer){
+                        return -1
+                    }
+                    return -1;
+                })
+                for(let i of loyalty){
+                    let total = 0
+                    data.labels.push(
+                        i.dealer
+                    )
+                    data.cl.push(
+                        i.cl
+                    )
+                    for(let j of i.surveys){
+                        let acc = 0
+                        for(let k of j.dcsis){
+                            switch(k.dcsi){
+                                case "BQ010":
+                                if(k.answer == 5){
+                                    acc += 1
+                                }
+                                break;
+                                case "CQ010":
+                                if(k.answer > 8){
+                                    acc += 1
+                                }
+                                break;
+                                case "CQ020":
+                                if(k.answer == 5){
+                                    acc += 1
+                                }
+                                break;
+                            }
+                            if(acc == 3){
+                                total += 1
+                            }
+                        }
+                    }
+                    data.values.push(
+                        Math.round((total / i.surveys.length * 100)*100)/100
+                    )
+                    // if((total / i.surveys.length)>0.44 || (total / i.surveys.length)== 0.44){
+                    //     data.color.push(
+                    //         'rgba(119,241,134)'
+                    //     )
+                    // } else if((total / i.surveys.length)< 0.44 && (total / i.surveys.length)>0.399){
+                    //     data.color.push(
+                    //         'rgba(249,234,43)'
+                    //     )
+                    // } else {
+                    //     data.color.push(
+                    //         'rgba(250,152,173)'
+                    //     )
+                    // }
+                }
+                Dealer.aggregate([
+                    { $match: {group_dealer:{ $nin:['PDI', 'NO GROUP']}} },
+                    { $group: { _id:{ group:"$group_dealer", cl:"$dealer_cod"},  count:{ $sum: 1} } },
+                    { $sort: { _id:-1 }},
+                    { $group: {
+                        _id:"$_id.group",
+                        cl_group:{ $push:{ cl:"$_id.cl", value:"" }}
+                    } },
+                    { $project: {
+                        _id:0,
+                        group:"$_id",
+                        value:"",
+                        cl:"$cl_group"
+                    }},
+                    { $sort:{group:1}}
+                ],(err, dealerByGroup)=>{
+                    if(err) return res.status(500).send({message:`Error al realizar la consulta ${err}`})
+                    if(dealerByGroup){
+                        for(let i=0; i<dealerByGroup.length; i++){
+                            for(let j=0; j<dealerByGroup[i].cl.length; j++){
+                                for(let k=0; k<data.labels.length; k++){
+                                    if(dealerByGroup[i].cl[j].cl == data.cl[k]){
+                                        dealerByGroup[i].cl[j].value = data.values[k]
+                                    }
+                                }
+                            }
+                        }
+    
+                        for(let i of dealerByGroup){
+                            newData.labels.push(
+                                i.group
+                            )
+                            let sum = 0
+                            let totalItems = 0
+                            for(let j of i.cl){
+                                
+                                if(j.value){
+                                    sum += j.value
+                                    totalItems += 1
+                                }
+                            }
+                            newData.values.push(
+                                Math.round( (sum / totalItems) * 100 )/ 100
+                            )
+                        }
+                        for(let i of newData.values){
+                            if(i){
+                                if((i >44) || (i == 44)){
+                                    // Verde
+                                    newData.color.push(
+                                        'rgba(119, 241, 134)'
+                                    )
+                                } else if((i > 40 || i == 40 ) && (i < 44)){
+                                    //Amarillo
+                                    newData.color.push(
+                                        'rgba(249, 234, 43)'
+                                    )
+                                } else if(i<84){
+                                    //Rojo
+                                    newData.color.push(
+                                        'rgba(250, 152, 173)'
+                                    )
+                                }
+                            } else {
+                                newData.color.push(
+                                    'rgba(255, 255, 255)'
+                                )
+                            }
+                        }
+                        res.status(200).send(newData)
+                    } else {
+                        res.status(200).send({message:`Objeto sin datos`}) 
+                    }
+
+                })
+                
+
+            })
+        } else {
+            res.status(200).send({message:`Objeto sin datos`})
+        }
+        // res.status(200).send(loyalty)
+        
+    })
+}
+function frftGroup(req, res){
+    let data = []
+    let newData = {labels:[], values:[], color:[], cl:[]}
+    let newData2 = {labels:[], values:[], color:[]}
+    let colorData = []
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match: { cod_dcsi:"BQ020"}},
+        { $match: { answer:{ $nin:[0]} }},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", answer:"$answer" },
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            total:{ $sum:"$total"},
+            answer:{
+                $push:{
+                    answer:"$_id.answer",
+                    total:"$total"
+                }
+            }
+        }},
+        { $project:{
+            _id:0,
+            cl:"$_id",
+            total:"$total",
+            answer:"$answer"
+        }}
+    ], (err, frft)=>{
+        if(err) return res.status(500).send({message:`Error al Obtener el FRFT ${err}`})
+        if(frft.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ], (err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al obtener delaers ${err}`})
+                for(let i=0;i<frft.length;i++){
+                    for(let j=0;j<dealer.length;j++){
+                        if(frft[i].cl == dealer[j].cl){
+                            for(let k=0; k<frft[i].answer.length;k++){
+                                if(frft[i].answer[k].answer == 1){
+                                    data.push({
+                                        name:dealer[j].av,
+                                        value:frft[i].answer[k].total / frft[i].total *100,
+                                        cl:dealer[j].cl
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+                data.sort((a,b)=>{
+                    if(a.name > b.name){
+                        return 1
+                    }
+                    if(a.name > b.name){
+                        return -1
+                    }
+                    return -1;
+                })
+                
+                for(let i of data){
+                    newData.labels.push(
+                        i.cl
+                    )
+                    newData.cl.push(
+                        i.cl
+                    )
+                    newData.values.push(
+                        Math.round(i.value*100)/100
+                    )
+                    if(i.value > 95 || i.value==95){
+                        newData.color.push(
+                            'rgba(119, 241, 134)'
+                        )
+                    } else if(i.value<95 && (i.value>90 || i.value==90)){
+                        newData.color.push(
+                            'rgba(249, 234, 43)'
+                        )
+                    } else {
+                        newData.color.push(
+                            'rgba(250, 152, 173)'
+                        )
+                    }
+                }
+                //Conversion del Objeto a grupo
+                Dealer.aggregate([
+                    // { $match: {cod_dealer:{$in: group} }},
+                    { $match: {group_dealer:{ $nin:['PDI', 'NO GROUP']}} },
+                    { $group: { _id:{ group:"$group_dealer", cl:"$dealer_cod"},  count:{ $sum: 1} } },
+                    { $sort: { _id:-1 }},
+                    { $group: {
+                        _id:"$_id.group",
+                        cl_group:{ $push:{ cl:"$_id.cl", value:"" }}
+                    } },
+                    { $project: {
+                        _id:0,
+                        group:"$_id",
+                        value:"",
+                        cl:"$cl_group"
+                    }},
+                    { $sort:{group:1}}
+                ], (err, dealerByGroup)=>{
+                    if(err) return res.status(500).send({message:`Error: ${err}`})
+                    if(dealerByGroup){
+                        for(let i=0; i<dealerByGroup.length; i++){
+                            for(let j=0; j<dealerByGroup[i].cl.length; j++){
+                                for(let k=0; k<newData.labels.length; k++){
+                                    if(dealerByGroup[i].cl[j].cl == newData.labels[k]){
+                                        dealerByGroup[i].cl[j].value = newData.values[k]
+                                    }
+                                }
+                            }
+                        }
+    
+                        for(let i of dealerByGroup){
+                            newData2.labels.push(
+                                i.group
+                            )
+                            let sum = 0
+                            let totalItems = 0
+                            for(let j of i.cl){
+                                
+                                if(j.value){
+                                    sum += j.value
+                                    totalItems += 1
+                                }
+                            }
+                            newData2.values.push(
+                                Math.round( (sum / totalItems) * 100 )/ 100
+                            )
+                        }
+                        for(let i of newData2.values){
+                            if(i){
+                                if((i >86) || (i == 86)){
+                                    // Verde
+                                    newData2.color.push(
+                                        'rgba(119, 241, 134)'
+                                    )
+                                } else if((i > 84 || i == 84 ) && (i < 86)){
+                                    //Amarillo
+                                    newData2.color.push(
+                                        'rgba(249, 234, 43)'
+                                    )
+                                } else if(i<84){
+                                    //Rojo
+                                    newData2.color.push(
+                                        'rgba(250, 152, 173)'
+                                    )
+                                }
+                            } else {
+                                newData2.color.push(
+                                    'rgba(255, 255, 255)'
+                                )
+                            }
+                        }
+                        res.status(200).send(newData2)
+                    } else {
+                        res.status(200).send({message:`Objeto sin datos`})
+                    }})
+                //Fin de Conversion
+            })
+        }
+    })
+}
+
 
 module.exports = {
     kacsGeneral,
@@ -1922,5 +2448,9 @@ module.exports = {
     getkacsAverage,
     getLoyaltyAverage,
     getFrftAverage,
-    getPer
+    getPer,
+    // Por Grupo
+    kacsGroup,
+    loyaltyGroup,
+    frftGroup
 }
