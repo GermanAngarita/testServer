@@ -15,11 +15,14 @@
     "cors": "^2.8.4",
     "crypto": "^1.0.1",
     "express": "^4.16.2",
+    "fs": "0.0.1-security",
     "jwt-simple": "^0.5.1",
     "moment": "^2.19.4",
     "mongo-xlsx": "^1.0.12",
     "mongoose": "^4.13.7",
+    "multer": "^1.3.0",
     "node-excel-export": "^1.4.3",
+    "node-fs": "^0.1.7",
     "nodemailer": "^4.6.4"
   },
   "devDependencies": {
