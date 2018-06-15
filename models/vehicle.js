@@ -5,7 +5,7 @@ const Schema = mongose.Schema
 
 const VehicleSchema = new Schema({
     model: { type: String},
-    code: { type: String, unique: true }
+    code: { type: String }
 })
 
 module.exports = mongoose.model('vehicle', VehicleSchema)
