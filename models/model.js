@@ -9,5 +9,6 @@ const ModelSchema = new Schema ({
     sixDigit: { type: String, unique: true},
     img: {type: String}
 })
+//Actualizar
 
 module.exports = mongoose.model('Model', ModelSchema)
