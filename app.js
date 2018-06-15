@@ -14,7 +14,7 @@ app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
   });
-
+app.use(express.static('uploads/models'))
 app.use('/api', api)
 
 
