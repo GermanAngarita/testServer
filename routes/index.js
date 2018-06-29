@@ -132,6 +132,21 @@ api.post('/report/kacsGroup', DcsiALT.kacsGroup)
 api.post('/report/loyaltyGroup', DcsiALT.loyaltyGroup)
 api.post('/report/frftGroup', DcsiALT.frftGroup)
 
+
+api.post('/report/getPromoterScore', DcsiALT.getPromoterScore)
+api.post('/report/getRetentionRate', DcsiALT.getRetentionRate)
+api.post('/report/getFLCRate', DcsiALT.getFLCRate)
+api.post('/report/getFLCRateCountry', DcsiALT.getFLCRateCountry)
+api.post('/report/getFLCEnhancedRate', DcsiALT.getFLCEnhancedRate)
+api.post('/report/getFLCEnhancedRateCountry', DcsiALT.getFLCEnhancedRateCountry)
+api.post('/report/getNPSRetention', DcsiALT.getNPSRetention)
+api.post('/report/getNPSRetentionCountry', DcsiALT.getNPSRetentionCountry)
+api.post('/report/getFLCHistoy', DcsiALT.getFLCHistoy)
+api.post('/report/getFLCEnhancedHisotry', DcsiALT.getFLCEnhancedHisotry)
+api.post('/report/getFLCEnhancedHisotryCountry', DcsiALT.getFLCEnhancedHisotryCountry)
+api.post('/report/getKacsDetails', DcsiALT.getKacsDetails)
+api.post('/report/getKacsDetailsAverage', DcsiALT.getKacsDetailsAverage)
+
 //KOT Kia On Time
 api.post('/uploads/newKot', KotController.addKot)
 api.post('/report/getSendPerDealer', KotController.getSendPerDealer)
