@@ -113,6 +113,7 @@ function kacsGeneral(req, res){
         }
     })
 }
+//Satisfaction
 function satisfactionIndKacs(req, res){
     let data = { labels:[], values:[]}
     let dateFrom = parseInt(req.body.fromDate)
@@ -243,7 +244,7 @@ function satisfactionIndLoyalty(req, res){
         { $match: { cod_dealer:{$in: group} }},
         { $match: { cod_dcsi:{ $in:["BQ010", "CQ010", "CQ020"]}} },
         { $group: {
-            _id:{ date:{ $substr:["$date",0,6]}, lead:"$lead_id", dcsi:"$cod_dcsi", answer:"$answer"}
+            _id:{ date:{ $substr:["$date",0,6]}, lead:"$vin", dcsi:"$cod_dcsi", answer:"$answer"}
         }},
         { $group:{
             _id:{date:"$_id.date", lead:"$_id.lead"},
@@ -321,6 +322,7 @@ function satisfactionIndLoyalty(req, res){
         res.status(200).send(data)
     })
 }
+//Kacs Result: Detalle de cada pregunta
 function getKacsResult(req, res){
     let dateFrom = parseInt(req.body.fromDate)
     let dateTo = parseInt(req.body.toDate)
@@ -334,7 +336,16 @@ function getKacsResult(req, res){
         { $match: { date:{$gte:dateFrom} }},
         { $match: { cod_dealer:{$in: group} }},
         { $match: { cod_dcsi:{$in:dcsi} }},
-        // { $match: { answer:{ $nin:[0]} }},
+        { $match: { answer:{ $nin:[0]} }},
+        {$project:{
+            cod_dcsi:"$cod_dcsi",
+            answer:{ $let:{
+                vars: { 
+                    value:{ $cond: { if:{ $eq: ["$answer", '']}, then:0, else: "$answer"} }
+                },
+                in: "$$value"
+            }}
+        }},
         { $group: {
             _id:{ dcsi:"$cod_dcsi", answer:"$answer" },
             total:{ $sum:1},
@@ -479,13 +490,10 @@ function getKacsResult(req, res){
         }
         res.status(200).send(data)
     })
-    
-
-    
 }
 function getKacsResultTrimonth(req, res){
     let data = {labels:[], values:[]}
-    let dateFrom = parseInt(moment(req.body.fromDate).subtract(3,'months').format('YYYYMMDD'))
+    let dateFrom = parseInt(moment(req.body.fromDate.toString()).subtract(3,'months').format('YYYYMMDD'))
     let dateTo = parseInt( req.body.fromDate)
     let group = req.body.group
     let dcsi = ["SQ030","SQ040", "SQ020", "SQ060", "SQ070", "SQ080", "SQ090", "SQ110"]
@@ -493,9 +501,18 @@ function getKacsResultTrimonth(req, res){
     Dcsi.aggregate([
         { $match: { date:{$lte:dateTo} }},
         { $match: { date:{$gte:dateFrom} }},
-        { $match: {cod_dealer:{$in: group} }},
-        { $match:{ cod_dcsi:{$in:dcsi} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match: { cod_dcsi:{$in:dcsi} }},
         { $match: { answer:{ $nin:[0]} }},
+        {$project:{
+            cod_dcsi:"$cod_dcsi",
+            answer:{ $let:{
+                vars: { 
+                    value:{ $cond: { if:{ $eq: ["$answer", '']}, then:0, else: "$answer"} }
+                },
+                in: "$$value"
+            }}
+        }},
         { $group: {
             _id:{ dcsi:"$cod_dcsi", answer:"$answer" },
             total:{ $sum:1},
@@ -521,9 +538,10 @@ function getKacsResultTrimonth(req, res){
             answers:"$answers",
             point:"$point",
             max_point:"$max_point",
-            value:{ $multiply:[{ $divide:["$point", "$max_point"] }, 100]}
+            value:{ $multiply:[ { $divide:["$point", "$max_point"] }, 100]}
         }}
     ],(err, kacsResultTri)=>{
+        
         if(err) return res.status(500).send({message:`Error al obtener los resultados ${err}`})
         if(kacsResultTri.length>0){
             kacsResultTri.push({
@@ -649,6 +667,7 @@ function getKacsResultTrimonth(req, res){
 
     
 }
+//Per Dealer
 function loyaltyPerDealer(req, res){
     let dateFrom = parseInt(req.body.fromDate)
     let dateTo = parseInt(req.body.toDate)
@@ -2153,19 +2172,6 @@ function loyaltyGroup(req, res){
                     data.values.push(
                         Math.round((total / i.surveys.length * 100)*100)/100
                     )
-                    // if((total / i.surveys.length)>0.44 || (total / i.surveys.length)== 0.44){
-                    //     data.color.push(
-                    //         'rgba(119,241,134)'
-                    //     )
-                    // } else if((total / i.surveys.length)< 0.44 && (total / i.surveys.length)>0.399){
-                    //     data.color.push(
-                    //         'rgba(249,234,43)'
-                    //     )
-                    // } else {
-                    //     data.color.push(
-                    //         'rgba(250,152,173)'
-                    //     )
-                    // }
                 }
                 Dealer.aggregate([
                     { $match: {group_dealer:{ $nin:['PDI', 'NO GROUP']}} },
@@ -2430,6 +2436,1278 @@ function frftGroup(req, res){
     })
 }
 
+//Funciones DCSI 
+function getPromoterScore(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let data = {labels:[], values:[], color:[]}
+    let dcsi = "CQ010"
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match:{ cod_dcsi:dcsi}},
+        { $group:{
+            _id:{ dealer:"$cod_dealer", answer:"$answer"},
+            total:{ $sum: 1}
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            surveys:{ $sum:"$total"},
+            answers: { $push:{
+                answer:"$_id.answer",
+                total:"$total",
+                points: { $multiply:["$total", "$_id.answer"]}
+            }}
+        }},
+        { $project:{
+            _id:0,
+            cl:"$_id",
+            av:"",
+            promoter:"",
+            surveys:"$surveys",
+            maxPoint: { $multiply:["$surveys", 10]},
+            answers:"$answers"
+        }}
+    ],(err, promoter)=>{
+        if(err) res.status(500).send({message:`Error al obtener Promoter Score ${err}`})
+        if(promoter.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ],(err, dealer)=>{
+                if(err) return res.status(500).send({message:`Error al traer los dealers ${err}`})
+                for(let j of dealer){
+                    for(let i=0; i<promoter.length; i++){
+                    
+                        if(promoter[i].cl == j.cl){
+                            promoter[i].av = j.av
+                        }
+                    }
+                }
+                promoter.sort((a,b)=>{
+                    if(a.av > b.av){
+                        return 1
+                    }
+                    if(a.av > b.av){
+                        return -1
+                    }
+                    return -1;
+                })
+                for(let i=0; i<promoter.length; i++){
+                    data.labels.push(promoter[i].av)
+                    let promoterScore = 0
+                    let notPromoterScore = 0
+                    for(let j=0; j<promoter[i].answers.length; j++){
+                        if(promoter[i].answers[j].answer > 8){
+                            promoterScore += promoter[i].answers[j].points / promoter[i].maxPoint
+                        } else if(promoter[i].answers[j].answer > -1 && promoter[i].answers[j].answer < 7){
+                            notPromoterScore += promoter[i].answers[j].points / promoter[i].maxPoint
+                        }
+                    }
+                    promoter[i].promoter = promoterScore - notPromoterScore
+                    data.values.push( Math.round( promoter[i].promoter * 10000)/100)
+                    if(promoter[i].promoter> 0.65 || promoter[i].promoter == 0.65){
+                        //Verde
+                        data.color.push('rgba(119, 241, 134)')
+                    } else if(promoter[i].promoter > 0.55 && promoter[i].promoter < 0.65){
+                        //Amarillo
+                        data.color.push('rgba(249, 234, 43)')
+                    } else {
+                        //Rojo
+                        data.color.push('rgba(250, 152, 173)')
+                    }
+                }
+                res.status(200).send(data)
+
+
+            })
+        } else {
+            res.status(200).send({message:`No se encuentró información`})
+        }
+        
+    })
+}
+function getRetentionRate(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let dcsi = "CQ020"
+    let data = {labels:[], values:[], color:[]}
+    let verde = "rgba(119, 241, 134)"
+    let amarillo = "rgba(249, 234, 43)"
+    let rojo = "rgba(250, 152, 173)"
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:dcsi }},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $group: {
+            _id:{ dealer:"$cod_dealer", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            total:{ $sum:"$total"},
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:"$total"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            cl:"$_id",
+            av:"",
+            retention:"0",
+            surveys:"$total",
+            answers:"$answers"
+        }}
+    ], (err, retention)=>{
+        if(err) res.status(500).send({message:`Error al consultar la información ${err}`})
+        // res.status(200).send(retention)
+        if(retention.length>0){
+            Dealer.aggregate([
+                { $project:{
+                    _id:0,
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer",
+                    city:"$city",
+                    group:"$group_dealer"
+                }},
+                { $sort:{av:1}}
+            ],(err, dealer)=>{
+                if(err) res.status(500).send({message:`Error al obtener los dealers ${err}`})
+                for(let j of dealer){
+                    for(let i=0; i<retention.length; i++){
+                    
+                        if(retention[i].cl == j.cl){
+                            retention[i].av = j.av
+                        }
+                    }
+                }
+                retention.sort((a,b)=>{
+                    if(a.av > b.av){
+                        return 1
+                    }
+                    if(a.av > b.av){
+                        return -1
+                    }
+                    return -1;
+                })
+                for(let i=0; i<retention.length; i++){
+                    let answer4 = 0, answer5 = 0
+                    data.labels.push(retention[i].av)
+                    for(let j=0; j<retention[i].answers.length; j++){
+                        switch(retention[i].answers[j].answer){
+                            case 4:
+                                answer4 = retention[i].answers[j].total / retention[i].surveys
+                            break;
+                            case 5:
+                                answer5 = retention[i].answers[j].total / retention[i].surveys
+                            break;
+                        }
+                    }
+                    retention[i].retention = answer4 + answer5
+                    data.values.push( Math.round( retention[i].retention*10000)/100 )
+                    //Color 
+                    if((answer4 + answer5) > 0.9 || (answer4 + answer5) == 0.9){
+                        data.color.push(verde)
+                    } else if ((answer4 + answer5) > 0.7 && (answer4 + answer5) < 0.9){
+                        data.color.push(amarillo)
+                    } else {
+                        data.color.push(rojo)
+                    } 
+                }
+                res.status(200).send(data)
+            })
+            
+        } else {
+            res.status(200).send(retention)
+        }
+    })
+}
+function getFLCRate(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let data = { labels:[
+        "RENTAL CAR",
+        "CAR WASH",
+        "HANDOVER",
+        "VHC",
+    ], values:[
+        0,
+        0,
+        0,
+        0
+    ]}
+    let dcsi = ["SQ130", "SQ050", "SQ090", "SQ120"]
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:{ $in:dcsi}}},
+        { $match: { answer: { $nin:[0]}}},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $group:{
+            _id:{ dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:"$_id.dcsi",
+            total:{ $sum:"$total" },
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:"$total"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dcsi:"$_id",
+            surveys:"$total",
+            answers:"$answers"
+        }}
+    ], (err, flcRate)=>{
+        if(err) res.status(500).send({message:`Error al consultar FLC + Rate ${err}`})
+        if(flcRate){
+            for(let i=0; i<flcRate.length; i++){
+                switch(flcRate[i].dcsi){
+                    //RENTAL CAR
+                    case "SQ120":
+                    let answer120=0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        if(flcRate[i].answers[j].answer == 1){
+                            answer120 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                    }
+                    // data.labels.push( "RENTAL CAR" )
+                    data.values[0] = Math.round( answer120 *10000)/100 
+                    break;
+                    //CARWASH
+                    case "SQ090":
+                    let a=0; let b=0;
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        if(flcRate[i].answers[j].answer == 4){
+                            a = flcRate[i].answers[j].total / flcRate[i].surveys
+                        } else if(flcRate[i].answers[j].answer == 5){
+                            b = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                    }
+                    // data.labels.push( "CAR WASH" )
+                    data.values[1] = Math.round( (a+b) *10000)/100 
+                    break;
+                    //HANDOVER
+                    case "SQ050":
+                    let answer4 = 0; let answer5 = 0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        
+                        if(flcRate[i].answers[j].answer == 4){
+                            answer4 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        } else if(flcRate[i].answers[j].answer == 5){
+                            answer5 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                        
+                    }
+                    // data.labels.push( "HANDOVER" )
+                    data.values[2] = Math.round( (answer4 + answer5) *10000)/100
+                    break;
+                    
+                    
+                    //VHC
+                    case "SQ130":
+                    let answer1=0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        if(flcRate[i].answers[j].answer == 1){
+                            answer1 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                    }
+                    // data.labels.push( "VHC" )
+                    data.values[3] = Math.round( answer1 *10000)/100 
+                    break;
+                }
+                if(i == flcRate.length -1){
+                    res.status(200).send(data)
+                }
+            }
+            
+        } else {
+            res.status(200).send({message:`No se encontró información`})
+        }
+        
+    })
+}
+function getFLCRateCountry(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let data = { labels:[
+        "RENTAL CAR",
+        "CAR WASH",
+        "HANDOVER",
+        "VHC",
+    ], values:[
+        0,
+        0,
+        0,
+        0
+    ]}
+    let dcsi = ["SQ130", "SQ050", "SQ090", "SQ120"]
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:{ $in:dcsi}}},
+        { $match: { answer: { $nin:[0]}}},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $group:{
+            _id:{ dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:"$_id.dcsi",
+            total:{ $sum:"$total" },
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:"$total"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dcsi:"$_id",
+            surveys:"$total",
+            answers:"$answers"
+        }}
+    ], (err, flcRate)=>{
+        if(err) res.status(500).send({message:`Error al consultar FLC + Rate ${err}`})
+        if(flcRate){
+            for(let i=0; i<flcRate.length; i++){
+                switch(flcRate[i].dcsi){
+                    //RENTAL CAR
+                    case "SQ120":
+                    let answer120=0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        if(flcRate[i].answers[j].answer == 1){
+                            answer120 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                    }
+                    // data.labels.push( "RENTAL CAR" )
+                    data.values[0] = Math.round( answer120 *10000)/100 
+                    break;
+                    //CARWASH
+                    case "SQ090":
+                    let a=0; let b=0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        if(flcRate[i].answers[j].answer == 4){
+                            a = flcRate[i].answers[j].total / flcRate[i].surveys
+                        } else if(flcRate[i].answers[j].answer == 5){
+                            b = flcRate[i].answers[j].total / flcRate[i].surveys
+                        } 
+                    }
+                    // data.labels.push( "CAR WASH" )
+                    
+                    data.values[1] = Math.round( (a + b) *10000)/100 
+                    break;
+                    //HANDOVER
+                    case "SQ050":
+                    let answer4 = 0; let answer5 = 0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        
+                        if(flcRate[i].answers[j].answer == 4){
+                            answer4 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        } else if(flcRate[i].answers[j].answer == 5){
+                            answer5 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                        
+                    }
+                    // data.labels.push( "HANDOVER" )
+                    data.values[2] = Math.round( (answer4 + answer5) *10000)/100
+                    break;
+                    
+                    
+                    //VHC
+                    case "SQ130":
+                    let answer1=0
+                    for(let j=0; j<flcRate[i].answers.length; j++){
+                        if(flcRate[i].answers[j].answer == 1){
+                            answer1 = flcRate[i].answers[j].total / flcRate[i].surveys
+                        }
+                    }
+                    // data.labels.push( "VHC" )
+                    data.values[3] = Math.round( answer1 *10000)/100 
+                    break;
+                }
+                if(i == flcRate.length -1){
+                    res.status(200).send(data)
+                }
+            }
+            
+        } else {
+            res.status(200).send({message:`No se encontró información`})
+        }
+        
+    })
+}
+function getFLCEnhancedRate(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let data = {
+        labels:["CUSTOMER LOUNGE", "EXPRESS SERVICE", "FOLLOW UP CALL"],
+        values:[0,0,0]
+    }
+    let dcsi = ["SQ100", "SQ140", "SQ150"]
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { answer: { $nin:[0]}}},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match: { cod_dcsi:{ $in:dcsi } }},
+        { $group: {
+            _id:{ dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum: 1}
+        }},
+        { $group:{
+            _id:"$_id.dcsi",
+            total:{ $sum:"$total"},
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:"$total",
+                points:{ $multiply:[ "$_id.answer", "$total" ]}
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dcsi:"$_id",
+            surveys:"$total",
+            maxPoint:{ $multiply:["$total", 5]},
+            answers:"$answers"
+
+        }}
+    ], (err, flc)=>{
+        if(err) res.status(500).send({message:`Error al consultar los datos ${err}`})
+        if(flc){
+            for(let i = 0; i<flc.length; i++){
+                let a=0; let b=0; let c=0; let d=0; let f=0;
+                switch(flc[i].dcsi){
+                    // CUSTOMER LOUNGE
+                    case "SQ100":
+                    for(let j=0; j<flc[i].answers.length; j++){
+                        if (flc[i].answers[j].answer == 4){
+                            d += flc[i].answers[j].total / flc[i].surveys
+                        } else if(flc[i].answers[j].answer == 5){
+                            f += flc[i].answers[j].total / flc[i].surveys
+                        }
+                    }
+                    data.values[0] = Math.round( (d+f) *10000)/100
+
+                    break;
+                    //EXPRESS SERVICE
+                    case "SQ140":
+                    for(let j=0; j<flc[i].answers.length; j++){
+                        if(flc[i].answers[j].answer == 1){
+                            data.values[1] = Math.round( flc[i].answers[j].total / flc[i].surveys * 10000)/100
+                        }
+                    }
+                    break;
+                    //FOLLOW UP CALL
+                    case "SQ150":
+                    for(let j=0; j<flc[i].answers.length; j++){
+                        if(flc[i].answers[j].answer == 1){
+                            data.values[2] = Math.round( flc[i].answers[j].total / flc[i].surveys * 10000)/100
+                        }
+                    }
+                    break;
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`No se encontraron datos`})
+        }
+        
+    })
+}
+function getFLCEnhancedRateCountry(req, res){
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate)
+    let data = {
+        labels:["CUSTOMER LOUNGE", "EXPRESS SERVICE", "FOLLOW UP CALL"],
+        values:[0,0,0]
+    }
+    let dcsi = ["SQ100", "SQ140", "SQ150"]
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { answer: { $nin:[0]}}},
+        { $match: { cod_dcsi:{ $in:dcsi } }},
+        { $group: {
+            _id:{ dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum: 1}
+        }},
+        { $group:{
+            _id:"$_id.dcsi",
+            total:{ $sum:"$total"},
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:"$total",
+                points:{ $multiply:[ "$_id.answer", "$total" ]}
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dcsi:"$_id",
+            surveys:"$total",
+            maxPoint:{ $multiply:["$total", 5]},
+            answers:"$answers"
+
+        }}
+    ], (err, flc)=>{
+        if(err) res.status(500).send({message:`Error al consultar los datos ${err}`})
+        if(flc){
+            for(let i = 0; i<flc.length; i++){
+                let a=0; let b=0; let c=0; let d=0; let f=0;
+                switch(flc[i].dcsi){
+                    // CUSTOMER LONGE
+                    case "SQ100":
+                    for(let j=0; j<flc[i].answers.length; j++){
+                        if(flc[i].answers[j].answer == 4){
+                            d = flc[i].answers[j].total / flc[i].surveys
+                        } else if(flc[i].answers[j].answer == 5){
+                            f = flc[i].answers[j].total / flc[i].surveys
+                        }
+                    }
+                    // data.values[0] = Math.round( (d+f) *10000)/100
+                    data.values[0] = Math.round( (d+f) *10000)/100
+
+                    break;
+                    //EXPRESS SERVICE
+                    case "SQ140":
+                    for(let j=0; j<flc[i].answers.length; j++){
+                        if(flc[i].answers[j].answer == 1){
+                            data.values[1] = Math.round( flc[i].answers[j].total / flc[i].surveys * 10000)/100
+                        }
+                    }
+                    break;
+                    //FOLLOW UP CALL
+                    case "SQ150":
+                    for(let j=0; j<flc[i].answers.length; j++){
+                        if(flc[i].answers[j].answer == 1){
+                            data.values[2] = Math.round( flc[i].answers[j].total / flc[i].surveys * 10000)/100
+                        }
+                    }
+                    break;
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`No se encontraron datos`})
+        }
+        
+    })
+}
+function getNPSRetention(req, res){
+    let data = { labels:[], nps:[], retention:[], surveys:[]}
+    let dcsi = ["CQ010", "CQ020"]
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let periodo = parseInt(req.body.periodos)
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match: { cod_dcsi:{ $in:dcsi} }},
+        {$group:{
+            _id: { date:{ $substr:["$date",0,6]}, dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group: {
+            _id:{date:"$_id.date", dcsi:"$_id.dcsi"},
+            surveys:{ $sum:"$total"},
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:{ $sum: "$total"}
+            }}
+        }},
+        { $group: {
+            _id: "$_id.date",
+            surveys:{ $sum: "$surveys" },
+            dcsi:{ $push: {
+                dcsi:"$_id.dcsi",
+                surveys:"$surveys",
+                answers:"$answers"
+            }}
+        }},
+        { $project: {
+            _id:0,
+            date: "$_id",
+            dcsi:"$dcsi",
+            surveys:"$surveys",
+            answers:"$answers"
+        }},
+        { $sort: { date:-1}},
+        { $limit: periodo},
+        { $sort: { date:1}},
+    ],(err, npsRetention)=>{
+        if(err) res.status(500).send({message:`Error al consultar la información ${err}`})
+        if(npsRetention.length > 0){
+            
+            for(let i=0; i<npsRetention.length; i++){
+                data.labels.push(npsRetention[i].date)
+                data.surveys.push(npsRetention[i].surveys / 2 )
+                
+                for(let j=0; j<npsRetention[i].dcsi.length; j++){
+                    
+                    switch(npsRetention[i].dcsi[j].dcsi){
+                        //NPS
+                        
+                        case "CQ010":
+                        let promote = 0; let notPromote = 0
+                        for(let k=0; k<npsRetention[i].dcsi[j].answers.length; k++){
+                            if(npsRetention[i].dcsi[j].answers[k].answer > 8){
+                                promote += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            } else if(npsRetention[i].dcsi[j].answers[k].answer > -1 && npsRetention[i].dcsi[j].answers[k].answer < 7 ){
+                                notPromote += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            }
+                        }
+                        data.nps.push( Math.round( (promote - notPromote) * 10000)/100 )
+
+                        break;
+                        //RETENTION RATE
+                        case "CQ020":
+                        let retention = 0
+                        for(let k=0; k<npsRetention[i].dcsi[j].answers.length; k++){
+                            if(npsRetention[i].dcsi[j].answers[k].answer == 4){
+                                retention += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            } else if(npsRetention[i].dcsi[j].answers[k].answer == 5 ){
+                                retention += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            }
+                        }
+                        data.retention.push( Math.round( retention * 10000)/100 )
+
+                        break;
+                    }
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`No se encontró información`})
+        }
+        
+    })
+    
+}
+function getNPSRetentionCountry(req, res){
+    let data = { labels:[], nps:[], retention:[]}
+    let dcsi = ["CQ010", "CQ020"]
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let periodo = parseInt(req.body.periodos)
+    Dcsi.aggregate([
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { cod_dcsi:{ $in:dcsi} }},
+        {$group:{
+            _id: { date:{ $substr:["$date",0,6]}, dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group: {
+            _id:{date:"$_id.date", dcsi:"$_id.dcsi"},
+            surveys:{ $sum:"$total"},
+            answers:{ $push:{
+                answer:"$_id.answer",
+                total:{ $sum: "$total"}
+            }}
+        }},
+        { $group: {
+            _id: "$_id.date",
+            
+            dcsi:{ $push: {
+                dcsi:"$_id.dcsi",
+                surveys:"$surveys",
+                answers:"$answers"
+            }}
+        }},
+        { $project: {
+            _id:0,
+            date: "$_id",
+            dcsi:"$dcsi",
+            surveys:"$surveys",
+            answers:"$answers"
+        }},
+        { $sort: { date:-1}},
+        { $limit: periodo},
+        { $sort: { date:1}},
+    ],(err, npsRetention)=>{
+        if(err) res.status(500).send({message:`Error al consultar la información ${err}`})
+        if(npsRetention.length > 0){
+            
+            for(let i=0; i<npsRetention.length; i++){
+                data.labels.push(npsRetention[i].date)
+                for(let j=0; j<npsRetention[i].dcsi.length; j++){
+                    
+                    switch(npsRetention[i].dcsi[j].dcsi){
+                        //NPS
+                        
+                        case "CQ010":
+                        let promote = 0; let notPromote = 0
+                        for(let k=0; k<npsRetention[i].dcsi[j].answers.length; k++){
+                            if(npsRetention[i].dcsi[j].answers[k].answer > 8){
+                                promote += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            } else if(npsRetention[i].dcsi[j].answers[k].answer > -1 && npsRetention[i].dcsi[j].answers[k].answer < 7 ){
+                                notPromote += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            }
+                        }
+                        data.nps.push( Math.round( (promote - notPromote) * 10000)/100 )
+
+                        break;
+                        //RETENTION RATE
+                        case "CQ020":
+                        let retention = 0
+                        for(let k=0; k<npsRetention[i].dcsi[j].answers.length; k++){
+                            if(npsRetention[i].dcsi[j].answers[k].answer == 4){
+                                retention += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            } else if(npsRetention[i].dcsi[j].answers[k].answer == 5 ){
+                                retention += npsRetention[i].dcsi[j].answers[k].total / npsRetention[i].dcsi[j].surveys
+                            }
+                        }
+                        data.retention.push( Math.round( retention * 10000)/100 )
+
+                        break;
+                    }
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`No se encontró información`})
+        }
+        
+    })
+    
+}
+function getFLCHistoy( req, res){
+    let data = { labels:[], vhc:[], handover:[], carwash:[], rentalcar:[] }
+    let dcsi = ["SQ130", "SQ050", "SQ091", "SQ120", "SQ090"]
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let periodo = parseInt(req.body.periodos)
+    Dcsi.aggregate([
+        { $match:{ cod_dcsi:{ $in:dcsi} }},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $match:{ answer:{ $nin:[0]}}},
+        { $group:{
+            _id: { date:{ $substr:["$date",0,6]}, dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:{ date:"$_id.date", dcsi:"$_id.dcsi" },
+            total:{ $sum: "$total" },
+            answers: { $push:{
+                answer:"$_id.answer",
+                total:{ $sum: "$total" }
+            }}
+        }},
+        { $group:{
+            _id: "$_id.date",
+            dcsi:{ $push:{
+                dcsi:"$_id.dcsi",
+                surveys:"$total",
+                answers:"$answers"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            date:"$_id",
+            dcsi:"$dcsi",
+
+        }},
+        { $sort: { date:-1}},
+        { $limit: periodo},
+        { $sort: { date:1}},
+    ], (err, flcRate)=>{
+        if(err) res.status(500).send({message:`Error al consultar FLC Histoy ${err}`})
+        if(flcRate.length > 0){
+            for(let i=0; i<flcRate.length; i++){
+                data.labels.push( flcRate[i].date )
+                for(let j=0; j<flcRate[i].dcsi.length; j++){
+                    switch( flcRate[i].dcsi[j].dcsi){
+                        case "SQ130":
+                        for(let k=0; k< flcRate[i].dcsi[j].answers.length; k++){
+                            if(flcRate[i].dcsi[j].answers[k].answer == 1){
+                               data.vhc.push( Math.round( flcRate[i].dcsi[j].answers[k].total / flcRate[i].dcsi[j].surveys*10000 )/100 )
+                            }
+                        }
+                        break;
+
+                        case "SQ050":
+                        let a=0; let b=0
+                        for(let k=0; k< flcRate[i].dcsi[j].answers.length; k++){
+                            if( flcRate[i].dcsi[j].answers[k].answer == 4){
+                               a =  Math.round( flcRate[i].dcsi[j].answers[k].total / flcRate[i].dcsi[j].surveys*10000 )/100 
+                            } 
+                            else if( flcRate[i].dcsi[j].answers[k].answer == 5 ){
+                               b =  Math.round( flcRate[i].dcsi[j].answers[k].total / flcRate[i].dcsi[j].surveys*10000 )/100 
+                            }
+                            
+                        }
+                        data.handover.push( Math.round( (a + b)*100)/100 )
+                        break;
+
+                        case "SQ090":
+                        let c=0; let d=0; let e=0;
+                        for(let k=0; k< flcRate[i].dcsi[j].answers.length; k++){
+                            if(flcRate[i].dcsi[j].answers[k].answer == 4){
+                                
+                                c = Math.round( flcRate[i].dcsi[j].answers[k].total / flcRate[i].dcsi[j].surveys*10000 )/100 
+                            } else if( flcRate[i].dcsi[j].answers[k].answer == 5){
+                                
+                                d = Math.round( flcRate[i].dcsi[j].answers[k].total / flcRate[i].dcsi[j].surveys*10000 )/100 
+                            } 
+                        }
+                        data.carwash.push( Math.round( (c + d)*100)/100 )
+                        break;
+
+                        case "SQ120":
+                        for(let k=0; k< flcRate[i].dcsi[j].answers.length; k++){
+                            if(flcRate[i].dcsi[j].answers[k].answer == 1){
+                               data.rentalcar.push( Math.round( flcRate[i].dcsi[j].answers[k].total / flcRate[i].dcsi[j].surveys*10000 )/100 )
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`Lo sentimos no se encontró información`})
+        }
+        
+    })
+}
+function getFLCEnhancedHisotry(req, res){
+    let data = { labels:[], customerlounge:[], express:[], followupcall:[] }
+    let dcsi = ["SQ100", "SQ140", "SQ150"]
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let periodo = parseInt(req.body.periodos)
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:{ $in:dcsi} }},
+        { $match:{ answer:{ $nin:[0]} }},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $group:{
+            _id: { date:{ $substr:["$date",0,6]}, dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:{ date:"$_id.date", dcsi:"$_id.dcsi" },
+            surveys:{ $sum:"$total"},
+            answers:{ $push:{
+                    answer:"$_id.answer",
+                    total:{ $sum:"$total"},
+                    // points:{ $multiply:[ {$sum:"$total"}, parseInt("$_id.answer")  ]}
+                }
+            }
+        }},
+        { $group:{
+            _id:"$_id.date",
+            dcsi:{ $push:{
+                dcsi:"$_id.dcsi",
+                surveys:{ $sum:"$surveys"},
+                answers:"$answers"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            date:"$_id",
+            dcsi:"$dcsi"
+        }},
+        { $sort: { date:-1}},
+        { $limit: periodo},
+        { $sort: { date:1}}
+    ],(err, flcEnhanced)=>{
+        if(err) return res.status(500).send({message:`Error al consultar FLC + Enhanced History ${err}`})
+        if(flcEnhanced){
+            for(let i=0; i<flcEnhanced.length; i++){
+                data.labels.push(flcEnhanced[i].date)
+                for(let j=0; j<flcEnhanced[i].dcsi.length; j++){
+                    switch(flcEnhanced[i].dcsi[j].dcsi){
+                        //CUSTOMER LOUNGE
+                        case "SQ100":
+                        let a=0; let b=0; let c=0; let d=0; let e=0
+                        for(let k=0; k<flcEnhanced[i].dcsi[j].answers.length; k++){
+                            if(flcEnhanced[i].dcsi[j].answers[k].answer == 4){
+                                a = flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys
+                            }else if(flcEnhanced[i].dcsi[j].answers[k].answer == 5){
+                                b = flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys
+                            }
+                            
+                        }
+                        data.customerlounge.push( Math.round( (a+b) *10000 )/100 ) 
+
+                        break;
+                        //EXPRESS SERVICE
+                        case "SQ140":
+                        for(let k=0; k<flcEnhanced[i].dcsi[j].answers.length; k++){
+                            if(flcEnhanced[i].dcsi[j].answers[k].answer == 1){
+                                data.express.push( Math.round( (flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys)*10000)/100  )
+                            }
+                        }
+                        break;
+
+                        //FOLLOWUPCALL
+                        case "SQ150":
+                        for(let k=0; k<flcEnhanced[i].dcsi[j].answers.length; k++){
+                            if(flcEnhanced[i].dcsi[j].answers[k].answer == 1){
+                                data.followupcall.push( Math.round( (flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys)*10000)/100  )
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`No se encontraron datos`})
+        }
+        
+    })
+}
+function getFLCEnhancedHisotryCountry(req, res){
+    let data = { labels:[], customerlounge:[], express:[], followupcall:[] }
+    let dcsi = ["SQ100", "SQ140", "SQ150"]
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let periodo = parseInt(req.body.periodos)
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:{ $in:dcsi} }},
+        { $match:{ answer:{ $nin:[0]} }},
+        { $match: { date:{$lte:dateTo} }},
+        { $group:{
+            _id: { date:{ $substr:["$date",0,6]}, dcsi:"$cod_dcsi", answer:"$answer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:{ date:"$_id.date", dcsi:"$_id.dcsi" },
+            surveys:{ $sum:"$total"},
+            answers:{ $push:{
+                    answer:"$_id.answer",
+                    total:{ $sum:"$total"},
+                    // points:{ $multiply:[ {$sum:"$total"}, "$_id.answer"  ]}
+                }
+            }
+        }},
+        { $group:{
+            _id:"$_id.date",
+            dcsi:{ $push:{
+                dcsi:"$_id.dcsi",
+                surveys:{ $sum:"$surveys"},
+                answers:"$answers"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            date:"$_id",
+            dcsi:"$dcsi"
+        }},
+        { $sort: { date:-1}},
+        { $limit: periodo},
+        { $sort: { date:1}}
+    ],(err, flcEnhanced)=>{
+        if(err) return res.status(500).send({message:`Error al consultar FLC + Enhanced ${err}`})
+        if(flcEnhanced){
+            for(let i=0; i<flcEnhanced.length; i++){
+                data.labels.push(flcEnhanced[i].date)
+                for(let j=0; j<flcEnhanced[i].dcsi.length; j++){
+                    switch(flcEnhanced[i].dcsi[j].dcsi){
+                        //CUSTOMER LOUNGE
+                        case "SQ100":
+                        let a=0; let b=0; let c=0; let d=0; let e=0
+                        for(let k=0; k<flcEnhanced[i].dcsi[j].answers.length; k++){
+                            if(flcEnhanced[i].dcsi[j].answers[k].answer == 4){
+                                a = flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys
+                            }else if(flcEnhanced[i].dcsi[j].answers[k].answer == 5){
+                                b = flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys
+                            }
+                            
+                        }
+                        data.customerlounge.push( Math.round( (a+b) *10000 )/100 ) 
+
+                        break;
+                        //EXPRESS SERVICE
+                        case "SQ140":
+                        for(let k=0; k<flcEnhanced[i].dcsi[j].answers.length; k++){
+                            if(flcEnhanced[i].dcsi[j].answers[k].answer == 1){
+                                data.express.push( Math.round( (flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys)*10000)/100  )
+                            }
+                        }
+                        break;
+
+                        //FOLLOWUPCALL
+                        case "SQ150":
+                        for(let k=0; k<flcEnhanced[i].dcsi[j].answers.length; k++){
+                            if(flcEnhanced[i].dcsi[j].answers[k].answer == 1){
+                                data.followupcall.push( Math.round( (flcEnhanced[i].dcsi[j].answers[k].total / flcEnhanced[i].dcsi[j].surveys)*10000)/100  )
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+            res.status(200).send(data)
+        } else {
+            res.status(200).send({message:`No se encontraron datos`})
+        }
+        
+    })
+}
+function getKacsDetails(req, res){
+
+    let dcsi = req.body.dcsi
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let data = {labels:[], values:[], color:[]}
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:{ $in:dcsi }}},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $match: { cod_dealer:{$in: group} }},
+        { $project:{
+            cod_dealer:"$cod_dealer",
+            cod_dcsi:"$cod_dcsi",
+            answer:{ $let:{
+                vars:{ 
+                    value:{ $cond:{ if:{ $eq:[ "$answer", "" ]}, then:0, else:"$answer" } }
+                 },
+                in:"$$value"
+            }}
+        }},
+        { $group:{
+            _id:{ dcsi:"$cod_dcsi", answer:"$answer", dealer:"$cod_dealer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:{ dealer:"$_id.dealer", dcsi:"$_id.dcsi" },
+            surveys:{ $sum:"$total"},
+            answer:{
+                $push:{
+                    answer:"$_id.answer",
+                    total:{ $sum:"$total"},
+                    point:{ $multiply:[ { $sum:"$total"},  "$_id.answer"]}
+                }
+            }
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            dcsi:{ $push:{
+                dcsi:"$_id.dcsi",
+                value:"",
+                surveys:{ $sum:"$surveys"},
+                answer:"$answer"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dealer:"$_id",
+            cl:"",
+            dcsi:"$dcsi"
+        }}
+    ], (err, kacs)=>{
+        if(err) return res.status(500).send({message:`Error al obtener kacs Details ${err}`})
+        if(kacs){
+            for(let i of kacs){
+                for(let j of i.dcsi){
+                    let total = 0
+                    for(let k of j.answer){
+                        total += k.point
+
+                    }
+                    j.value = Math.round( total / (j.surveys * 5)*10000 )/100
+                }
+            }
+            Dealer.aggregate([
+                { $project:{
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer"
+                }}
+            ], (err, dealer)=>{
+                if(err) return res-status(500).send({message:`Error al consultar los dealer ${err}`})
+                for(let i of kacs){
+                    for(let j of dealer){
+                        if(i.dealer == j.cl){
+                            i.cl = j.av
+                        }
+                    }
+                }
+                kacs.sort((a,b)=>{
+                    if(a.cl > b.cl){
+                        return 1
+                    }
+                    if(a.cl > b.cl){
+                        return -1
+                    }
+                    return -1;
+                })
+                for(let i of kacs){
+                    data.labels.push(i.cl)
+                    for(let j of i.dcsi){
+                        data.values.push(j.value)
+
+                        if((j.value >86) || (j.value == 86)){
+                            // Verde
+                            data.color.push(
+                                'rgba(119, 241, 134)'
+                            )
+                        } else if((j.value > 84 || j.value == 84 ) && (j.value < 86)){
+                            //Amarillo
+                            data.color.push(
+                                'rgba(249, 234, 43)'
+                            )
+                        } else if(j.value<84){
+                            //Rojo
+                            data.color.push(
+                                'rgba(250, 152, 173)'
+                            )
+                        }
+                    }
+                }
+                res.status(200).send(data)
+            })
+        } else {
+            res.status(200).send({message:`No se encontró información Kacs Details`})
+        }
+    })
+}
+function getKacsDetailsAverage(req, res){
+
+    let dcsi = req.body.dcsi
+    let dateFrom = parseInt(req.body.fromDate)
+    let dateTo = parseInt(req.body.toDate) 
+    let group = req.body.group
+    let data = {
+        avg:0,
+        dealers:0,
+        best:{ dealer:'', value:''},
+        worts:{ dealer:'', value:''},
+        chart:[]
+    }
+    let preData = []
+    Dcsi.aggregate([
+        { $match: { cod_dcsi:{ $in:dcsi }}},
+        { $match: { date:{$lte:dateTo} }},
+        { $match: { date:{$gte:dateFrom} }},
+        { $project:{
+            cod_dealer:"$cod_dealer",
+            cod_dcsi:"$cod_dcsi",
+            answer:{ $let:{
+                vars:{ 
+                    value:{ $cond:{ if:{ $eq:[ "$answer", "" ]}, then:0, else:"$answer" } }
+                 },
+                in:"$$value"
+            }}
+        }},
+        { $group:{
+            _id:{ dcsi:"$cod_dcsi", answer:"$answer", dealer:"$cod_dealer"},
+            total:{ $sum:1}
+        }},
+        { $group:{
+            _id:{ dealer:"$_id.dealer", dcsi:"$_id.dcsi" },
+            surveys:{ $sum:"$total"},
+            answer:{
+                $push:{
+                    answer:"$_id.answer",
+                    total:{ $sum:"$total"},
+                    point:{ $multiply:[ { $sum:"$total"},  "$_id.answer"]}
+                }
+            }
+        }},
+        { $group:{
+            _id:"$_id.dealer",
+            dcsi:{ $push:{
+                dcsi:"$_id.dcsi",
+                value:"",
+                surveys:{ $sum:"$surveys"},
+                answer:"$answer"
+            }}
+        }},
+        { $project:{
+            _id:0,
+            dealer:"$_id",
+            cl:"",
+            dcsi:"$dcsi"
+        }}
+    ], (err, kacs)=>{
+        if(err) return res.status(500).send({message:`Error al obtener kacs Details ${err}`})
+        if(kacs){
+            for(let i of kacs){
+                for(let j of i.dcsi){
+                    let total = 0
+                    for(let k of j.answer){
+                        total += k.point
+
+                    }
+                    j.value = Math.round( total / (j.surveys * 5)*10000 )/100
+                }
+            }
+            Dealer.aggregate([
+                { $project:{
+                    cl:"$dealer_cod",
+                    av:"$subname_dealer"
+                }}
+            ], (err, dealer)=>{
+                if(err) return res-status(500).send({message:`Error al consultar los dealer ${err}`})
+                for(let i of kacs){
+                    for(let j of dealer){
+                        if(i.dealer == j.cl){
+                            i.cl = j.av
+                        }
+                    }
+                }
+                for(let i =0; i< kacs.length; i++){
+                    preData.push({
+                        dealer: kacs[i].cl,
+                        value: kacs[i].dcsi[0].value
+                    })
+                }
+                //Get Average
+                let avg = 0; 
+                for(let i of preData){
+                    avg += i.value
+                }
+                data.dealers = preData.length
+                data.avg = Math.round( avg / parseInt(preData.length) *100 )/100
+                //Get Best and Worts
+                preData.sort((a,b)=>{
+                    if(a.value > b.value){
+                        return 1
+                    }
+                    if(a.value > b.value){
+                        return -1
+                    }
+                    return -1;
+                })
+                data.best.dealer = preData[parseInt(preData.length) - 1].dealer
+                data.best.value = preData[parseInt(preData.length) - 1].value
+                data.worts.dealer = preData[0].dealer
+                data.worts.value = preData[0].value
+                //Full in data Chart
+                for(let i of preData){
+                    data.chart.push( data.avg )
+                }
+
+                
+                res.status(200).send(data)
+            })
+        } else {
+            res.status(200).send({message:`No se encontró información Kacs Details`})
+        }
+    })
+}
+
 
 module.exports = {
     kacsGeneral,
@@ -2452,5 +3730,20 @@ module.exports = {
     // Por Grupo
     kacsGroup,
     loyaltyGroup,
-    frftGroup
+    frftGroup,
+
+    getPromoterScore,
+    getRetentionRate,
+    getFLCRate,
+    getFLCRateCountry,
+    getFLCEnhancedRate,
+    getFLCEnhancedRateCountry,
+    getNPSRetention,
+    getNPSRetentionCountry,
+    getFLCHistoy,
+    getFLCEnhancedHisotry,
+    getFLCEnhancedHisotryCountry,
+
+    getKacsDetails,
+    getKacsDetailsAverage
 }
