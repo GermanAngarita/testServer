@@ -104,10 +104,10 @@ function getNewPass(req, res){
                             -webkit-margin-before: 1em;
                             -webkit-margin-after: 1em;
                             -webkit-margin-start: 0px;
-                            -webkit-margin-end: 0px;" >dear user, it is your new password: <br> <br>
+                            -webkit-margin-end: 0px;" >dear user, this is your new password: <br> <br>
                                 <strong>${newPassword}</strong> <br> <br>
                                 to login follow the next url: <br>
-                                <button style="cursor: pointer;
+                                <a style="cursor: pointer;
                                 box-sizing: border-box;
                                 padding: .25rem .5rem;
                         font-size: .875rem;
@@ -131,7 +131,7 @@ function getNewPass(req, res){
                         line-height: 1.5;
                         border-radius: .25rem;
                         transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
-                        text-decoration: none;" class="btn btn-outline-primary btn-sm" href="http://localhost:4200/">KASC Login</button>
+                        text-decoration: none;" class="btn btn-outline-primary btn-sm" target="_blank" href="http://test.mibbu.com/">KASC Login</a>
                             </p>
                         </section>
                         <footer style="color: #f8f9fa!important;
