@@ -367,12 +367,14 @@ function getTimePerDealer(req, res){
                     for(let o of points){
                         if(i.cl == o.dealer){
                             data.labels.push( i.av )
-                            data.values.push(Math.round(o.values*100 )/100)
-                            if( o.values > 2 || o.values == 2 ){
-                                data.color.push( 'rgba(250, 152, 173)' )
-                            } else {
-                                data.color.push( 'rgba(119, 241, 134)' )
+                            data.values.push(Math.round(o.values*10000 )/100)
+                            if( o.values > 0.9 || o.values == 0.9 ){
                                 
+                                data.color.push( 'rgba(119, 241, 134)' )
+                            } else if( (o.values > 0.8 || o.values == 0.8) && o.values < 0.9 ){
+                                data.color.push( 'rgba(249, 234, 43)' )
+                            } else {
+                                data.color.push( 'rgba(250, 152, 173)' )
                             }
                         }
                     }
