@@ -9,7 +9,7 @@ function sendEmailTest(req, res){
     //     service:'Gmail',
     //     auth:{
     //         user: 'mtkingdespos@gmail.com',
-    //         pass:'Metrokiaing2018'
+    //         pass:'********'
     //     }
     // })
 
@@ -48,7 +48,7 @@ function getNewPass(req, res){
                     service:'Gmail',
                     auth:{
                         user: 'mtkingdespos@gmail.com',
-                        pass:'Metrokiaing2018'
+                        pass:'********'
                     }
                 })
                 console.log('Este es el objeto que devuelve password'+getNewPass)
